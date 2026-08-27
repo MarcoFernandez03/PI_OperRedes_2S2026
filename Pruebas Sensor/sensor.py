@@ -13,8 +13,8 @@ def write_to_file():
 
 
 # Por estas cosas no me gusta python, como que esto es básicamente "main"?
+pir = MotionSensor(4) # Recordar que esto es número de pin GPIO, no el número físico del pin
 while True:
-  pir = MotionSensor(4) # Recordar que esto es número de pin GPIO, no el número físico del pin
   print("Searching for motion")
   pir.wait_for_motion()
   print("Motion detected!")
