@@ -1,6 +1,6 @@
-#from gpiozero import MotionSensor # gpiozero permite importar distintos sensores
+from gpiozero import MotionSensor # gpiozero permite importar distintos sensores
 from datetime import datetime
-from random import randrange # BORRAR CUANDO SE CUENTE CON EL SENSOR REAL
+
 
 
 
@@ -14,10 +14,11 @@ def write_to_file():
 
 # Por estas cosas no me gusta python, como que esto es básicamente "main"?
 while True:
-  #pir = MotionSensor(4) # Recordar que esto es número de pin GPIO, no el número físico del pin
-  #pir.wait_for_motion()
-  if randrange(100) < 50:  # Simulación de detección de movimiento BORRAR CUANDO SE CUENTE CON EL SENSOR REAL
-    print("Motion detected!")
-    write_to_file()
+  pir = MotionSensor(4) # Recordar que esto es número de pin GPIO, no el número físico del pin
+  print("Searching for motion")
+  pir.wait_for_motion()
+  print("Motion detected!")
+  write_to_file()
+  pir.wait_for_no_motion() # Esperar a que el pin del sensor vuelva a 0V, resulta que si existía
 
 # LOS COMENTARIOS SON EL CÓDIGO PARA EL SENSOR DE MOVIMIENTO REAL, EL RESTO ES SIMULACIÓN PARA PODER PROBARLO SIN EL SENSOR
