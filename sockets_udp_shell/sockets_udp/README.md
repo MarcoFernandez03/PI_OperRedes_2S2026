@@ -139,6 +139,111 @@ Al terminar, `salida.txt` debe ser idéntico al archivo original. Esto ya
 se probó localmente (incluyendo un archivo de ~118 fragmentos) y el
 resultado es byte a byte idéntico.
 
+## Integración con la syscall del kernel
+
+`Kernel/send_sensor_data.c` implementa una syscall que crea un socket UDP
+**en kernel**, envía un único datagrama, y cierra el socket
+(`sock_create_kern` → `kernel_sendmsg` → `sock_release`, todo en la misma
+llamada). Esto tiene dos implicaciones para la integración con `UDPSocket`:
+
+1. **No hay `bind()` antes de enviar** → el puerto de origen es efímero y
+   distinto en cada llamada.
+2. **El socket se cierra apenas termina de enviar** → no hay forma de
+   recibir una respuesta (el ACK) por ese mismo camino.
+
+Por eso la integración separa emisión y recepción en dos canales
+distintos del lado del Raspberry Pi:
+
+- **Salida (DATA/FIN)** → por la syscall, vía `enviarPorSyscall()`
+  (`include/SyscallTransport.h`).
+- **Entrada (ACK)** → por un `UDPSocket` normal, bindeado a un **puerto
+  fijo conocido de antemano** (`PUERTO_ACK_LOCAL` en los argumentos del
+  programa). El servidor debe contestar el ACK a ese puerto fijo, no al
+  puerto de origen que ve en `recvfrom()` (ese es el efímero de la
+  syscall, ya cerrado). La IP sí puede tomarse de `recvfrom()`
+  normalmente.
+
+### Archivos nuevos
+
+| Archivo | Rol |
+|---|---|
+| `include/SyscallTransport.h`, `src/SyscallTransport.cpp` | Wrapper de `syscall(NUMERO, ...)` para invocar `send_sensor_data` desde C++ |
+| `examples/ejemplo_emisor_syscall.cpp` | Emisor: envía por la syscall, recibe ACK por `UDPSocket` en puerto fijo |
+| `examples/ejemplo_receptor_syscall.cpp` | Receptor: contesta el ACK al puerto fijo del Pi, no al puerto de origen |
+
+### ⚠️ Falta un dato: el número de syscall
+
+`include/SyscallTransport.h` define:
+
+```cpp
+constexpr long NUMERO_SYSCALL_SEND_SENSOR_DATA = 471; // <-- CONFIRMAR
+```
+
+Ese `471` es una **estimación**, no un dato confirmado. El equipo dijo
+que usa **kernel 6.18**, y desde el kernel 6.11 arm64 dejó de tener tabla
+de syscalls propia: usa la misma tabla genérica que el resto de
+arquitecturas modernas (`scripts/syscall.tbl`). Revisando esa tabla en el
+árbol oficial de Linux, el último número asignado hasta la serie 6.18 es
+`470` (`listns`); los números `471` (`rseq_slice_yield`) y `472`
+(`fchroot`) son adiciones posteriores, todavía no presentes en 6.18. Si
+agregaron `send_sensor_data` al final del archivo sin tocar nada más, lo
+más probable es que haya quedado en el **471** — por eso ese es el valor
+que trae el código. Aun así, hay que **confirmarlo** contra el archivo
+real que editaron al compilar el kernel (buscar la línea con
+`send_sensor_data`). Sin el número correcto, la llamada falla con
+`ENOSYS` ("Function not implemented").
+
+**Importante:** ese número es específico del kernel exacto que
+compilaron. Probarlo en cualquier otra máquina (por ejemplo, una laptop
+x86_64 con Linux estándar) no sirve para validar nada — podría incluso
+coincidir por casualidad con una syscall real distinta ya existente ahí,
+dando un error que no tiene nada que ver con el código (esto pasó al
+probar el placeholder anterior, `451`, en un x86_64: coincide con
+`cachestat`, y el kernel devolvió `EBADF` en vez de `ENOSYS`, porque
+`cachestat` esperaba un descriptor de archivo como primer argumento). La
+única prueba real es en el Raspberry Pi, con `Kernel/Image` booteado.
+
+### Por qué se deshace el `htonl` antes de llamar a la syscall
+
+`send_sensor_data` recibe `dest_ip` y hace `htonl(dest_ip)` internamente
+(línea `addr.sin_addr.s_addr = htonl(dest_ip)` en el `.c`). Pero
+`inet_pton()` en el lado de userspace ya entrega la IP en orden de red.
+Si se le pasara ese valor tal cual a la syscall, el `htonl` del kernel lo
+invertiría *de nuevo* y la IP llegaría corrupta. `enviarPorSyscall()` ya
+resuelve esto internamente con `ntohl()` antes de la llamada — no hace
+falta pensarlo al usar la función, pero vale la pena entender por qué
+está ahí si algún día cambian algo de esa parte.
+
+### Cómo probarlo en el Pi
+
+Con el kernel personalizado ya booteado en el Raspberry Pi:
+
+```bash
+make   # genera los 4 binarios, incluyendo los _syscall
+
+# En el servidor (Linux/Mac, kernel normal):
+./ejemplo_receptor_syscall 30000 salida.txt 41000
+#                          ^puerto DATA      ^debe coincidir con el
+#                                             puerto_ack_local del Pi
+
+# En el Raspberry Pi (con el kernel de Kernel/Image corriendo):
+./ejemplo_emisor_syscall <IP_DEL_SERVIDOR> 30000 archivo_a_enviar.txt 41000
+```
+
+Si el número de syscall está bien, el flujo es idéntico al de
+`ejemplo_emisor`/`ejemplo_receptor` (mismo protocolo, mismos logs), solo
+que el envío pasa por el kernel en vez de por un socket de usuario. Si
+falla con `ENOSYS`, el número en `SyscallTransport.h` no coincide con el
+del kernel — revisar el paso anterior.
+
+### De archivo a datos reales del sensor
+
+Tanto `ejemplo_emisor.cpp` como `ejemplo_emisor_syscall.cpp` leen de un
+archivo con `ifstream` a modo de prueba. Cuando se integre con
+`Pruebas Sensor/sensor.cpp` (o `sensor.py`), ese `ifstream` se reemplaza
+por lo que entregue el sensor — el resto del flujo (fragmentar, `seq`,
+`enviarFragmentoConfirmado`) no cambia.
+
 ## Notas / pendientes para integrar con el resto del equipo
 
 - `protocolo::MAX_PAYLOAD` (actualmente 1024 bytes) y `MAX_REINTENTOS`
