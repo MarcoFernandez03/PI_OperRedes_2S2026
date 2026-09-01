@@ -25,6 +25,10 @@
 #include <fstream>
 #include <vector>
 #include <cstdint>
+#include <thread>
+#include <chrono>
+
+const int delayMinutes = 1;
 
 namespace
 {
@@ -81,61 +85,62 @@ int main(int argc, char* argv[])
     unsigned short puertoServidor = static_cast<unsigned short>(std::stoi(argv[2]));
     std::string archivoEntrada = argv[3];
     unsigned short puertoAckLocal = static_cast<unsigned short>(std::stoi(argv[4]));
-
-    try
-    {
-        // Este UDPSocket NO se usa para enviar: solo escucha los ACK que
-        // devuelve el servidor, en un puerto fijo conocido de antemano.
-        UDPSocket socketAck;
-        socketAck.bind(puertoAckLocal);
-        socketAck.setTimeout(TIMEOUT_SEG);
-
-        std::ifstream entrada(archivoEntrada, std::ios::binary);
-        if (!entrada)
+    while (true){
+        std::this_thread::sleep_for(std::chrono::minutes(delayMinutes));
+        try
         {
-            std::cerr << "No se pudo abrir el archivo de entrada: " << archivoEntrada << "\n";
-            return 1;
-        }
+            // Este UDPSocket NO se usa para enviar: solo escucha los ACK que
+            // devuelve el servidor, en un puerto fijo conocido de antemano.
+            UDPSocket socketAck;
+            socketAck.bind(puertoAckLocal);
+            socketAck.setTimeout(TIMEOUT_SEG);
 
-        std::vector<uint8_t> bufferLectura(protocolo::MAX_PAYLOAD);
-        uint32_t seq = 0;
-
-        std::cout << "Enviando por syscall a " << ipServidor << ":" << puertoServidor
-                  << ", escuchando ACK en el puerto local " << puertoAckLocal << "...\n";
-
-        while (true)
-        {
-            entrada.read(reinterpret_cast<char*>(bufferLectura.data()), bufferLectura.size());
-            std::streamsize leidos = entrada.gcount();
-
-            bool esUltimoFragmento = entrada.eof();
-            protocolo::TipoTrama tipo = esUltimoFragmento ? protocolo::FIN : protocolo::DATA;
-
-            bool confirmado = enviarFragmentoConfirmado(
-                socketAck, ipServidor, puertoServidor,
-                tipo, seq, bufferLectura.data(), static_cast<uint16_t>(leidos));
-
-            if (!confirmado)
+            std::ifstream entrada(archivoEntrada, std::ios::binary);
+            if (!entrada)
             {
-                std::cerr << "Fallo de conexión: no se confirmó el fragmento seq=" << seq << "\n";
+                std::cerr << "No se pudo abrir el archivo de entrada: " << archivoEntrada << "\n";
                 return 1;
             }
 
-            std::cout << "Fragmento seq=" << seq << " confirmado (" << leidos << " bytes).\n";
-            seq++;
+            std::vector<uint8_t> bufferLectura(protocolo::MAX_PAYLOAD);
+            uint32_t seq = 0;
 
-            if (esUltimoFragmento)
+            std::cout << "Enviando por syscall a " << ipServidor << ":" << puertoServidor
+                    << ", escuchando ACK en el puerto local " << puertoAckLocal << "...\n";
+
+            while (true)
             {
-                std::cout << "Archivo transmitido por completo.\n";
-                break;
+                entrada.read(reinterpret_cast<char*>(bufferLectura.data()), bufferLectura.size());
+                std::streamsize leidos = entrada.gcount();
+
+                bool esUltimoFragmento = entrada.eof();
+                protocolo::TipoTrama tipo = esUltimoFragmento ? protocolo::FIN : protocolo::DATA;
+
+                bool confirmado = enviarFragmentoConfirmado(
+                    socketAck, ipServidor, puertoServidor,
+                    tipo, seq, bufferLectura.data(), static_cast<uint16_t>(leidos));
+
+                if (!confirmado)
+                {
+                    std::cerr << "Fallo de conexión: no se confirmó el fragmento seq=" << seq << "\n";
+                    return 1;
+                }
+
+                std::cout << "Fragmento seq=" << seq << " confirmado (" << leidos << " bytes).\n";
+                seq++;
+
+                if (esUltimoFragmento)
+                {
+                    std::cout << "Archivo transmitido por completo.\n";
+                    break;
+                }
             }
         }
+        catch (const SocketException& e)
+        {
+            std::cerr << "Error: " << e.description() << "\n";
+            return 1;
+        }
     }
-    catch (const SocketException& e)
-    {
-        std::cerr << "Error: " << e.description() << "\n";
-        return 1;
-    }
-
     return 0;
 }
