@@ -25,6 +25,7 @@
 #include <fstream>
 #include <vector>
 #include <cstdint>
+#include <cstdio>
 #include <thread>
 #include <chrono>
 
@@ -132,6 +133,12 @@ int main(int argc, char* argv[])
                 if (esUltimoFragmento)
                 {
                     std::cout << "Archivo transmitido por completo.\n";
+                    // Borrar archivo de entrada tras enviarlo
+                    if (std::remove(archivoEntrada.c_str()) == 0) {
+                        std::cout << "Archivo borrado: " << archivoEntrada << "\n";
+                    } else {
+                        std::cerr << "No se pudo borrar el archivo: " << archivoEntrada << "\n";
+                    }
                     break;
                 }
             }

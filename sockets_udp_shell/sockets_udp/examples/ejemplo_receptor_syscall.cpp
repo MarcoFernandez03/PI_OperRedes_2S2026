@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
             UDPSocket socket;
             socket.bind(puerto);
 
-            std::ofstream salida(archivoSalida, std::ios::binary | std::ios::trunc);
+            std::ofstream salida(archivoSalida, std::ios::binary | std::ios::app);
             if (!salida)
             {
                 std::cerr << "No se pudo abrir el archivo de salida: " << archivoSalida << "\n";
