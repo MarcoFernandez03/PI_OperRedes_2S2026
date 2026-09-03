@@ -15,9 +15,11 @@
 #include <fstream>
 #include <vector>
 #include <cstdint>
+#include <cstdlib>
 
 int main(int argc, char* argv[])
 {
+    srand(time(NULL));
     if (argc < 3)
     {
         std::cerr << "Uso: " << argv[0] << " <puerto> <archivo_salida>\n";
@@ -57,6 +59,13 @@ int main(int argc, char* argv[])
             // indefinidamente hasta que llega algo. El timeout/retransmisión
             // es responsabilidad del EMISOR, no del receptor.
             int recibidos = socket.receiveFrom(buffer.data(), buffer.size(), &ipOrigen, &puertoOrigen);
+
+            // Simulación de perdida de paquetes
+            int probabilidadPerdida = (std::rand() % 100) + 1;
+            if (probabilidadPerdida <= 30){
+                std::cout << "Paquete perdido por simulación \n";
+                continue;
+            }
 
             protocolo::EncabezadoDatos encabezado;
             const uint8_t* payload = nullptr;

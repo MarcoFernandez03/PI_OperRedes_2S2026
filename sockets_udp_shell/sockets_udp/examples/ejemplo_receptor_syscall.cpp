@@ -19,11 +19,14 @@
 #include <fstream>
 #include <vector>
 #include <cstdint>
+#include <cstdlib>
 #include <thread>
 #include <chrono>
+#include <time.h>
 
 int main(int argc, char* argv[])
 {
+    srand(time(NULL));
     if (argc < 4)
     {
         std::cerr << "Uso: " << argv[0] << " <puerto_escucha> <archivo_salida> <puerto_ack_pi>\n";
@@ -63,6 +66,13 @@ int main(int argc, char* argv[])
                 unsigned short puertoOrigenIgnorado; // no se usa: ver comentario arriba
 
                 int recibidos = socket.receiveFrom(buffer.data(), buffer.size(), &ipOrigen, &puertoOrigenIgnorado);
+                
+                // Simulación de perdida de paquetes
+                int probabilidadPerdida = (std::rand() % 100) + 1;
+                if (probabilidadPerdida <= 30){
+                    std::cout << "Paquete perdido por simulación \n";
+                    continue;
+                }
 
                 protocolo::EncabezadoDatos encabezado;
                 const uint8_t* payload = nullptr;
