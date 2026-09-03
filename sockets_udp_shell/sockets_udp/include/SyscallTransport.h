@@ -35,7 +35,7 @@
 // el archivo equivalente que hayan editado) del árbol fuente del kernel
 // que compilaron, buscando la línea con send_sensor_data. Si el número
 // real es otro, cambiarlo aquí.
-constexpr long NUMERO_SYSCALL_SEND_SENSOR_DATA = 471; // Debemos confirmar que concuerde 
+constexpr long NUMERO_SYSCALL_SEND_SENSOR_DATA = 470; // Debemos confirmar que concuerde 
                                                       // contra el propio árbol del kernel
 
 // Envía 'len' bytes a host:puerto usando la syscall send_sensor_data

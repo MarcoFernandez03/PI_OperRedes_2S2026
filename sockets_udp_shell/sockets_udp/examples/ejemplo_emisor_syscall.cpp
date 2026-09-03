@@ -100,46 +100,47 @@ int main(int argc, char* argv[])
             if (!entrada)
             {
                 std::cerr << "No se pudo abrir el archivo de entrada: " << archivoEntrada << "\n";
-                return 1;
-            }
+                
+            } else {
 
-            std::vector<uint8_t> bufferLectura(protocolo::MAX_PAYLOAD);
-            uint32_t seq = 0;
+                std::vector<uint8_t> bufferLectura(protocolo::MAX_PAYLOAD);
+                uint32_t seq = 0;
 
-            std::cout << "Enviando por syscall a " << ipServidor << ":" << puertoServidor
-                    << ", escuchando ACK en el puerto local " << puertoAckLocal << "...\n";
+                std::cout << "Enviando por syscall a " << ipServidor << ":" << puertoServidor
+                        << ", escuchando ACK en el puerto local " << puertoAckLocal << "...\n";
 
-            while (true)
-            {
-                entrada.read(reinterpret_cast<char*>(bufferLectura.data()), bufferLectura.size());
-                std::streamsize leidos = entrada.gcount();
-
-                bool esUltimoFragmento = entrada.eof();
-                protocolo::TipoTrama tipo = esUltimoFragmento ? protocolo::FIN : protocolo::DATA;
-
-                bool confirmado = enviarFragmentoConfirmado(
-                    socketAck, ipServidor, puertoServidor,
-                    tipo, seq, bufferLectura.data(), static_cast<uint16_t>(leidos));
-
-                if (!confirmado)
+                while (true)
                 {
-                    std::cerr << "Fallo de conexión: no se confirmó el fragmento seq=" << seq << "\n";
-                    return 1;
-                }
+                    entrada.read(reinterpret_cast<char*>(bufferLectura.data()), bufferLectura.size());
+                    std::streamsize leidos = entrada.gcount();
 
-                std::cout << "Fragmento seq=" << seq << " confirmado (" << leidos << " bytes).\n";
-                seq++;
+                    bool esUltimoFragmento = entrada.eof();
+                    protocolo::TipoTrama tipo = esUltimoFragmento ? protocolo::FIN : protocolo::DATA;
 
-                if (esUltimoFragmento)
-                {
-                    std::cout << "Archivo transmitido por completo.\n";
-                    // Borrar archivo de entrada tras enviarlo
-                    if (std::remove(archivoEntrada.c_str()) == 0) {
-                        std::cout << "Archivo borrado: " << archivoEntrada << "\n";
-                    } else {
-                        std::cerr << "No se pudo borrar el archivo: " << archivoEntrada << "\n";
+                    bool confirmado = enviarFragmentoConfirmado(
+                        socketAck, ipServidor, puertoServidor,
+                        tipo, seq, bufferLectura.data(), static_cast<uint16_t>(leidos));
+
+                    if (!confirmado)
+                    {
+                        std::cerr << "Fallo de conexión: no se confirmó el fragmento seq=" << seq << "\n";
+                        return 1;
                     }
-                    break;
+
+                    std::cout << "Fragmento seq=" << seq << " confirmado (" << leidos << " bytes).\n";
+                    seq++;
+
+                    if (esUltimoFragmento)
+                    {
+                        std::cout << "Archivo transmitido por completo.\n";
+                        // Borrar archivo de entrada tras enviarlo
+                        if (std::remove(archivoEntrada.c_str()) == 0) {
+                            std::cout << "Archivo borrado: " << archivoEntrada << "\n";
+                        } else {
+                            std::cerr << "No se pudo borrar el archivo: " << archivoEntrada << "\n";
+                        }
+                        break;
+                    }
                 }
             }
         }
