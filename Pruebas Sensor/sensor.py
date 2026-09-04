@@ -1,24 +1,18 @@
-from gpiozero import MotionSensor # gpiozero permite importar distintos sensores
+from gpiozero import MotionSensor # gpiozero contains different imports for sensors
 from datetime import datetime
 
 
-
-
-# Esto no hace falta cambiarlo, la escritura funciona como debería
 def write_to_file():
   with open("motion_log.txt", "a") as file:
     file.write("Motion detected!" + " " + datetime.now().strftime("%d.%b %Y %H:%M:%S") + "\n")
-    # Para enviar desde C este archivo debería renombrarse para llevar un control de lecturas nuevas y a enviar para no chocar
-    # con el archivo que se sigue escribiendo, python crearía uno nuevo cada vez que ya no exista por estarse enviando
+    # To send the file from C++ the output file should be renamed or deleted to manage new lecture without redundancy of old
+    # readings from the sensor, pytho creates a new file if it doesn't find the file
 
-
-# Por estas cosas no me gusta python, como que esto es básicamente "main"?
-pir = MotionSensor(4) # Recordar que esto es número de pin GPIO, no el número físico del pin
+# Program "main"
+pir = MotionSensor(4) # GPIO pin, not physical pin number
 while True:
   print("Searching for motion")
-  pir.wait_for_motion()
+  pir.wait_for_motion() # waiting for motion signal
   print("Motion detected!")
   write_to_file()
-  pir.wait_for_no_motion() # Esperar a que el pin del sensor vuelva a 0V, resulta que si existía
-
-# LOS COMENTARIOS SON EL CÓDIGO PARA EL SENSOR DE MOVIMIENTO REAL, EL RESTO ES SIMULACIÓN PARA PODER PROBARLO SIN EL SENSOR
+  pir.wait_for_no_motion() # wait for pin voltage to drop down to 0V
