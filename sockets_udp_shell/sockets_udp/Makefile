@@ -4,12 +4,9 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude
 SRC = src/UDPSocket.cpp src/Trama.cpp
 SRC_SYSCALL = $(SRC) src/SyscallTransport.cpp
 
-# ejemplo_emisor / ejemplo_receptor: prueba pura de sockets (sin syscall),
-#   útil para validar la red entre el Pi y el servidor sin depender del
-#   kernel personalizado.
-# ejemplo_emisor_syscall / ejemplo_receptor_syscall: integración real con
-#   la syscall del kernel. ejemplo_emisor_syscall SOLO corre en el
-#   Raspberry Pi con el kernel personalizado (Kernel/Image) booteado.
+# ejemplo_emisor / ejemplo_receptor: regular UDP transport examples.
+# ejemplo_emisor_syscall / ejemplo_receptor_syscall: custom-kernel examples.
+#   The sender requires the custom kernel on the Raspberry Pi.
 all: ejemplo_receptor ejemplo_emisor ejemplo_receptor_syscall ejemplo_emisor_syscall
 
 ejemplo_receptor: examples/ejemplo_receptor.cpp $(SRC)

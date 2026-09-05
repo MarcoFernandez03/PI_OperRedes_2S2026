@@ -1,21 +1,12 @@
 // ejemplo_emisor_syscall.cpp
 //
-// Versión del emisor que corre en el Raspberry Pi usando el kernel
-// personalizado (Kernel/Image). A diferencia de ejemplo_emisor.cpp:
+// Sender variant for the Raspberry Pi custom kernel.
 //
-//   - El envío de DATA/FIN se hace con la syscall send_sensor_data
-//     (enviarPorSyscall), NO con UDPSocket::send().
-//   - La recepción de ACK sigue usando UDPSocket normal, pero bindeado
-//     a un puerto FIJO conocido de antemano (PUERTO_ACK_LOCAL), porque
-//     la syscall no deja ningún socket abierto para recibir respuestas
-//     (crea uno, envía, y lo cierra en cada llamada -> puerto efímero
-//     distinto cada vez, inútil para recibir).
+// DATA/FIN frames use send_sensor_data; ACKs use a fixed-port UDPSocket.
 //
-// El servidor debe correr ejemplo_receptor_syscall (no ejemplo_receptor),
-// que sabe contestar el ACK a PUERTO_ACK_LOCAL en vez de al puerto de
-// origen que reporta recvfrom().
+// The server must run ejemplo_receptor_syscall to use that fixed ACK port.
 //
-// Uso: ./ejemplo_emisor_syscall <ip_servidor> <puerto_servidor> <archivo_entrada> <puerto_ack_local>
+// Usage: ./ejemplo_emisor_syscall <server_ip> <server_port> <input_file> <ack_port>
 
 #include "SyscallTransport.h"
 #include "UDPSocket.h"
@@ -34,7 +25,7 @@ const int delayMinutes = 1;
 namespace
 {
     constexpr int TIMEOUT_SEG = 2;
-    constexpr int MAX_REINTENTOS = 5;
+    constexpr int MAX_REINTENTOS = 100;
 }
 
 bool enviarFragmentoConfirmado(UDPSocket& socketAck,
@@ -49,8 +40,7 @@ bool enviarFragmentoConfirmado(UDPSocket& socketAck,
 
     for (int intento = 0; intento < MAX_REINTENTOS; ++intento)
     {
-        // --- Único cambio real respecto a ejemplo_emisor.cpp: ---
-        // en vez de socket.send(...), se usa la syscall del kernel.
+        // Send through the kernel syscall instead of socket.send().
         enviarPorSyscall(tramaSalida.data(), tramaSalida.size(), ipServidor, puertoServidor);
 
         try
@@ -90,11 +80,10 @@ int main(int argc, char* argv[])
         std::this_thread::sleep_for(std::chrono::minutes(delayMinutes));
         try
         {
-            // Este UDPSocket NO se usa para enviar: solo escucha los ACK que
-            // devuelve el servidor, en un puerto fijo conocido de antemano.
+            // This socket only receives ACKs on the agreed fixed port.
             UDPSocket socketAck;
             socketAck.bind(puertoAckLocal);
-            socketAck.setTimeout(TIMEOUT_SEG);
+            socketAck.setTimeout(0, 100);
 
             std::ifstream entrada(archivoEntrada, std::ios::binary);
             if (!entrada)
@@ -133,7 +122,7 @@ int main(int argc, char* argv[])
                     if (esUltimoFragmento)
                     {
                         std::cout << "Archivo transmitido por completo.\n";
-                        // Borrar archivo de entrada tras enviarlo
+                        // Remove the input file after transmission.
                         if (std::remove(archivoEntrada.c_str()) == 0) {
                             std::cout << "Archivo borrado: " << archivoEntrada << "\n";
                         } else {

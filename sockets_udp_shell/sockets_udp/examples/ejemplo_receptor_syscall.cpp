@@ -1,16 +1,10 @@
 // ejemplo_receptor_syscall.cpp
 //
-// Igual que ejemplo_receptor.cpp, con un solo cambio importante: el ACK
-// no se contesta al puerto de origen que reporta receiveFrom() (ese es el
-// puerto efímero que la syscall del kernel usó y ya cerró), sino a un
-// puerto FIJO del Raspberry Pi, acordado de antemano (el mismo
-// PUERTO_ACK_LOCAL con el que el emisor bindeó su socketAck en
-// ejemplo_emisor_syscall.cpp).
+// Receiver variant that sends ACKs to the Raspberry Pi fixed ACK port.
 //
-// La IP sí se toma del datagrama recibido (ipOrigen), porque esa sigue
-// siendo la IP real del Raspberry Pi; lo único que no sirve es el puerto.
+// The sender IP is still taken from the received datagram.
 //
-// Uso: ./ejemplo_receptor_syscall <puerto_escucha> <archivo_salida> <puerto_ack_pi>
+// Usage: ./ejemplo_receptor_syscall <listen_port> <output_file> <pi_ack_port>
 
 #include "UDPSocket.h"
 #include "Trama.h"
@@ -63,11 +57,11 @@ int main(int argc, char* argv[])
             while (true)
             {
                 std::string ipOrigen;
-                unsigned short puertoOrigenIgnorado; // no se usa: ver comentario arriba
+                unsigned short puertoOrigenIgnorado; // Source port is not used.
 
                 int recibidos = socket.receiveFrom(buffer.data(), buffer.size(), &ipOrigen, &puertoOrigenIgnorado);
                 
-                // Simulación de perdida de paquetes
+                // Simulate packet loss.
                 int probabilidadPerdida = (std::rand() % 100) + 1;
                 if (probabilidadPerdida <= 30){
                     std::cout << "Paquete perdido por simulación \n";
@@ -93,8 +87,7 @@ int main(int argc, char* argv[])
                     huboAlMenosUnFragmento = true;
 
                     protocolo::construirTramaAck(encabezado.seq, bufferAck);
-                    // Clave: se contesta a (ipOrigen, puertoAckPi), NO a
-                    // (ipOrigen, puertoOrigenIgnorado).
+                    // Reply to the fixed ACK port, not the syscall source port.
                     socket.sendTo(bufferAck.data(), bufferAck.size(), ipOrigen, puertoAckPi);
 
                     std::cout << "Fragmento seq=" << encabezado.seq

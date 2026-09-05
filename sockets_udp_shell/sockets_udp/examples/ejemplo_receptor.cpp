@@ -1,12 +1,8 @@
 // ejemplo_receptor.cpp
 //
-// Corre en la computadora Linux/Mac que actúa como servidor.
-// Escucha en un puerto UDP, recibe fragmentos DATA/FIN en orden
-// (usando seq_esperado), los escribe a un archivo de salida y
-// confirma cada uno con un ACK, siguiendo el flujo del receptor
-// descrito en el protocolo del equipo.
+// Receives acknowledged DATA/FIN fragments and reconstructs a file.
 //
-// Uso: ./ejemplo_receptor <puerto> <archivo_salida>
+// Usage: ./ejemplo_receptor <listen_port> <output_file>
 
 #include "UDPSocket.h"
 #include "Trama.h"
@@ -44,7 +40,7 @@ int main(int argc, char* argv[])
         std::cout << "Receptor escuchando en el puerto " << puerto << "...\n";
 
         uint32_t seqEsperado = 0;
-        uint32_t ultimoSeqConfirmado = 0; // para reenviar el ACK si llega una retransmisión
+        uint32_t ultimoSeqConfirmado = 0; // Resend this ACK for duplicates.
         bool huboAlMenosUnFragmento = false;
 
         std::vector<uint8_t> buffer(protocolo::TAM_HEADER_DATOS + protocolo::MAX_PAYLOAD);
@@ -55,12 +51,10 @@ int main(int argc, char* argv[])
             std::string ipOrigen;
             unsigned short puertoOrigen;
 
-            // Nota: aquí NO se usa setTimeout() -> receiveFrom() bloquea
-            // indefinidamente hasta que llega algo. El timeout/retransmisión
-            // es responsabilidad del EMISOR, no del receptor.
+            // The receiver blocks; timeout and retransmission are sender tasks.
             int recibidos = socket.receiveFrom(buffer.data(), buffer.size(), &ipOrigen, &puertoOrigen);
 
-            // Simulación de perdida de paquetes
+            // Simulate packet loss.
             int probabilidadPerdida = (std::rand() % 100) + 1;
             if (probabilidadPerdida <= 30){
                 std::cout << "Paquete perdido por simulación \n";
@@ -78,7 +72,7 @@ int main(int argc, char* argv[])
 
             if (encabezado.seq == seqEsperado)
             {
-                // Fragmento nuevo y en orden: se escribe y se confirma.
+                // New in-order fragment: write and acknowledge it.
                 if (encabezado.longitud > 0)
                 {
                     salida.write(reinterpret_cast<const char*>(payload), encabezado.longitud);
@@ -96,9 +90,7 @@ int main(int argc, char* argv[])
             }
             else
             {
-                // No coincide con lo esperado: se asume una retransmisión de
-                // un fragmento ya procesado. No se vuelve a escribir; solo
-                // se reenvía el último ACK confirmado.
+                // Duplicate or out-of-order fragment: do not write it again.
                 std::cout << "Fragmento duplicado/fuera de orden seq=" << encabezado.seq
                           << " (esperado=" << seqEsperado << "), se reenvía ACK.\n";
 

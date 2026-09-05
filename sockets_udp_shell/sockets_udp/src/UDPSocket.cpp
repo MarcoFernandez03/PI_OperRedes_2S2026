@@ -9,8 +9,7 @@
 
 namespace
 {
-    // Convierte un mensaje de error de sistema (errno) en texto,
-    // igual que hace SocketException::description() en el ejemplo TCP.
+    // Formats the current system error.
     std::string errorDeSistema(const std::string& contexto)
     {
         return contexto + ": " + std::strerror(errno);
@@ -59,6 +58,7 @@ void UDPSocket::close()
     }
 }
 
+// Binds the socket to a local port.
 void UDPSocket::bind(unsigned short puerto, const std::string& ip_local)
 {
     sockaddr_in direccion{};
@@ -98,8 +98,7 @@ void UDPSocket::setDestino(const std::string& host, unsigned short puerto)
     m_destino.sin_family = AF_INET;
     m_destino.sin_port = htons(puerto);
 
-    // Primero se intenta como dirección IP literal; si falla, se resuelve
-    // como nombre de host (por ejemplo "localhost" o un hostname de la red).
+    // Try a literal IP first, then resolve the host name.
     if (::inet_pton(AF_INET, host.c_str(), &m_destino.sin_addr) != 1)
     {
         addrinfo hints{};
@@ -120,6 +119,7 @@ void UDPSocket::setDestino(const std::string& host, unsigned short puerto)
     m_tieneDestino = true;
 }
 
+// Sends len bytes to the destination configured with setDestino().
 int UDPSocket::send(const void* datos, std::size_t len) const
 {
     if (!m_tieneDestino)
@@ -136,6 +136,7 @@ int UDPSocket::send(const void* datos, std::size_t len) const
     return static_cast<int>(enviados);
 }
 
+// Sends len bytes to a specific host and port.
 int UDPSocket::sendTo(const void* datos, std::size_t len,
                        const std::string& host, unsigned short puerto) const
 {
@@ -157,6 +158,8 @@ int UDPSocket::sendTo(const void* datos, std::size_t len,
     return static_cast<int>(enviados);
 }
 
+// Receives up to maxLen bytes and optionally returns the sender address.
+// A configured timeout raises SocketTimeoutException.
 int UDPSocket::receiveFrom(void* buffer, std::size_t maxLen,
                             std::string* ipOrigen, unsigned short* puertoOrigen) const
 {
@@ -168,10 +171,7 @@ int UDPSocket::receiveFrom(void* buffer, std::size_t maxLen,
 
     if (recibidos < 0)
     {
-        // EAGAIN / EWOULDBLOCK es lo que devuelve recvfrom() cuando expira
-        // el timeout fijado con setTimeout(). Se traduce a una excepción
-        // específica para que la capa del protocolo distinga "no llegó
-        // nada a tiempo" (debe retransmitir) de un error real de socket.
+        // EAGAIN/EWOULDBLOCK indicates that the receive timeout expired.
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
             throw SocketTimeoutException();

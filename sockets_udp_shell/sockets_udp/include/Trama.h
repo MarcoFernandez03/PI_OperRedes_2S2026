@@ -6,24 +6,13 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Serialización de las tramas definidas en el protocolo del equipo SHELL.
+// Serialization of protocol frames.
 //
-// IMPORTANTE: por qué esto NO se hace simplemente enviando un struct
-// "tal cual" por el socket (algo como sendto(&trama, sizeof(trama), ...)):
+// Frames are built manually instead of sending a struct directly.
 //
-//   1) Padding: el compilador puede insertar bytes de relleno entre campos
-//      de un struct para alinearlos en memoria (por ejemplo entre el
-//      uint8_t y el uint32_t). sizeof(struct) puede no ser 7 bytes aunque
-//      los campos sumen 1+4+2. Esto además puede variar entre plataformas
-//      (Raspberry Pi ARM vs. servidor x86_64/Mac).
-//   2) Orden de bytes (endianness): ARM (Raspberry Pi) suele ser
-//      little-endian, y hosts x86_64 también, pero no hay que asumirlo;
-//      la convención de red es big-endian ("network byte order"). Por eso
-//      se usan htonl/ntohl y htons/ntohs.
+// Padding and endianness can vary across platforms.
 //
-// Para evitar ambos problemas, se arma el datagrama a mano en un buffer de
-// bytes, campo por campo, en vez de confiar en la representación en
-// memoria del struct.
+// This avoids compiler padding and ensures network byte order.
 // ---------------------------------------------------------------------------
 
 namespace protocolo
@@ -35,59 +24,48 @@ namespace protocolo
         FIN  = 2
     };
 
-    // Tamaño máximo de payload por fragmento. Ajustar según lo que
-    // acuerde el equipo (debe quedar por debajo del límite práctico de
-    // un datagrama UDP, considerando cabeceras IP/UDP, para evitar
-    // fragmentación a nivel de IP).
+    // Maximum payload size per fragment.
     constexpr std::size_t MAX_PAYLOAD = 1024;
 
-    // Tamaño del encabezado en el cable (wire format), NO sizeof(struct):
-    constexpr std::size_t TAM_HEADER_DATOS = 1 + 4 + 2; // tipo + seq + longitud
-    constexpr std::size_t TAM_HEADER_ACK   = 1 + 4;     // tipo + seq
+    // Header sizes on the wire, not sizeof(struct).
+    constexpr std::size_t TAM_HEADER_DATOS = 1 + 4 + 2; // type + seq + length
+    constexpr std::size_t TAM_HEADER_ACK   = 1 + 4;     // type + seq
 
-    // Representación "cómoda" en memoria de una trama DATA/FIN ya
-    // deserializada (para usar en el código, no para enviar tal cual).
+    // In-memory representations of decoded frames.
     struct EncabezadoDatos
     {
-        uint8_t  tipo;      // DATA o FIN
+        uint8_t  tipo;      // DATA or FIN
         uint32_t seq;
-        uint16_t longitud;  // bytes de payload
+        uint16_t longitud;  // Payload bytes.
     };
 
     struct EncabezadoAck
     {
-        uint8_t  tipo;      // siempre ACK
+        uint8_t  tipo;      // Always ACK.
         uint32_t seq;
     };
 
-    // --- Construcción (emisor) --------------------------------------------
+    // --- Frame construction -----------------------------------------------
 
-    // Arma en 'salida' una trama DATA o FIN lista para enviar por el
-    // socket. 'salida' se redimensiona automáticamente.
-    // tipo debe ser DATA o FIN.
+    // Builds a DATA or FIN frame in salida.
     void construirTramaDatos(TipoTrama tipo, uint32_t seq,
                               const uint8_t* payload, uint16_t longitud,
                               std::vector<uint8_t>& salida);
 
-    // Arma en 'salida' una trama ACK lista para enviar por el socket.
+    // Builds an ACK frame in salida.
     void construirTramaAck(uint32_t seq, std::vector<uint8_t>& salida);
 
-    // --- Interpretación (receptor) ------------------------------------------
+    // --- Frame parsing -----------------------------------------------------
 
-    // Lee solo el primer byte para saber qué tipo de trama llegó, sin
-    // asumir todavía cuál de las dos formas de encabezado aplica.
-    // Lanza std::runtime_error si el buffer viene vacío.
+    // Reads the frame type. Throws std::runtime_error for an empty buffer.
     TipoTrama leerTipo(const uint8_t* buffer, std::size_t len);
 
-    // Interpreta 'buffer' (de tamaño 'len', tal como lo devolvió
-    // UDPSocket::receiveFrom) como un encabezado DATA/FIN.
-    // 'payload' queda apuntando dentro de 'buffer' (no se copia).
-    // Devuelve false si 'len' es menor al tamaño mínimo esperado o si
-    // 'longitud' no concuerda con los bytes realmente recibidos.
+    // Parses a DATA/FIN frame. payload points into buffer and is not copied.
+    // Returns false when the frame length is invalid.
     bool parsearTramaDatos(const uint8_t* buffer, std::size_t len,
                             EncabezadoDatos& out, const uint8_t*& payload);
 
-    // Interpreta 'buffer' como un encabezado ACK.
+    // Parses an ACK frame.
     bool parsearTramaAck(const uint8_t* buffer, std::size_t len, EncabezadoAck& out);
 
 } // namespace protocolo

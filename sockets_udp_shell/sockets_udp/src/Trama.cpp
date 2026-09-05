@@ -29,6 +29,7 @@ void construirTramaDatos(TipoTrama tipo, uint32_t seq,
     }
 }
 
+// Builds an ACK frame in salida.
 void construirTramaAck(uint32_t seq, std::vector<uint8_t>& salida)
 {
     salida.resize(TAM_HEADER_ACK);
@@ -67,8 +68,7 @@ bool parsearTramaDatos(const uint8_t* buffer, std::size_t len,
     std::memcpy(&longitudRed, buffer + 5, sizeof(longitudRed));
     out.longitud = ntohs(longitudRed);
 
-    // Verificación de consistencia: lo que dice 'longitud' debe coincidir
-    // con lo que realmente llegó en el datagrama.
+    // The declared payload length must match the received datagram.
     if (len != TAM_HEADER_DATOS + out.longitud)
     {
         return false;

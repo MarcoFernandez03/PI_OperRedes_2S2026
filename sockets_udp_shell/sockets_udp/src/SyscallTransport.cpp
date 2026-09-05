@@ -16,16 +16,13 @@ void enviarPorSyscall(const void* datos, std::size_t len,
         throw SocketException("IP destino inválida para la syscall: " + host);
     }
 
-    // inet_pton ya deja s_addr en orden de red (big-endian). La syscall,
-    // del lado del kernel, hace htonl(dest_ip) internamente, así que si le
-    // pasáramos el valor de inet_pton tal cual, se aplicaría la conversión
-    // dos veces y la IP llegaría corrupta. Por eso se deshace con ntohl()
-    // antes de pasarlo: el kernel espera el valor en orden de HOST.
+    // The kernel syscall expects the address in host byte order.
     uint32_t ipOrdenHost = ntohl(direccion.s_addr);
 
     long resultado = ::syscall(NUMERO_SYSCALL_SEND_SENSOR_DATA,
                                 datos, len, ipOrdenHost, puerto);
-
+    
+    // Check for syscall errors.
     if (resultado < 0)
     {
         std::string detalle = std::strerror(errno);

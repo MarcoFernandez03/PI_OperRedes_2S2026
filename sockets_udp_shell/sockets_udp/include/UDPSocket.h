@@ -10,84 +10,60 @@
 // ---------------------------------------------------------------------------
 // UDPSocket
 // ---------------------------------------------------------------------------
-// Envoltorio (wrapper) en C++ sobre un socket UDP crudo (SOCK_DGRAM).
+// C++ wrapper for a UDP datagram socket.
 //
-// A diferencia de ClientSocket/ServerSocket del ejemplo TCP, aquí NO existe
-// el concepto de "conexión" ni de accept(): un único objeto UDPSocket puede
-// tanto enviar como recibir datagramas hacia/desde cualquier dirección.
+// UDP has no connection or accept step; one object can send and receive.
 //
-// Esta clase es intencionalmente "tonta": no sabe nada del protocolo de
-// tramas (DATA/ACK/FIN, números de secuencia, retransmisión, etc). Eso se
-// implementa en una capa aparte (ver Trama.h y la lógica de emisor/receptor
-// del equipo), que usa este socket únicamente para:
-//   - enviar bytes a una IP:puerto destino
-//   - recibir bytes desde cualquier IP:puerto, con un timeout configurable
+// Protocol framing and retransmission are implemented in a separate layer.
 //
-// Esa separación es justamente la que comentaban en el chat: el socket no
-// depende del protocolo, el protocolo se apoya en el socket.
+// This keeps the transport independent from the protocol.
 // ---------------------------------------------------------------------------
 class UDPSocket
 {
 public:
-    // Crea el socket UDP (llama a socket(AF_INET, SOCK_DGRAM, 0)).
-    // Lanza SocketException si falla.
+    // Creates the UDP socket. Throws SocketException on failure.
     UDPSocket();
 
-    // Cierra el descriptor si sigue abierto.
+    // Closes the descriptor if it is still open.
     ~UDPSocket();
 
-    // No tiene sentido copiar un socket (el descriptor es un recurso único).
+    // A socket owns a unique descriptor and cannot be copied.
     UDPSocket(const UDPSocket&) = delete;
     UDPSocket& operator=(const UDPSocket&) = delete;
 
-    // Permite moverlo (útil si se quiere devolver por valor, meterlo en un
-    // vector, etc.)
+    // Allows ownership transfer.
     UDPSocket(UDPSocket&& otro) noexcept;
     UDPSocket& operator=(UDPSocket&& otro) noexcept;
 
-    // ---- Configuración -----------------------------------------------
+    // ---- Configuration ------------------------------------------------
 
-    // Asocia el socket a un puerto local para poder RECIBIR datagramas
-    // en ese puerto (típico en el receptor / servidor).
-    // ip_local: "0.0.0.0" para escuchar en todas las interfaces.
+    // Binds the socket to a local port. "0.0.0.0" listens on all interfaces.
     void bind(unsigned short puerto, const std::string& ip_local = "0.0.0.0");
 
-    // Define un timeout para las llamadas a receiveFrom()/receive().
-    // Es la base para implementar el timeout de espera de ACK que pide
-    // el protocolo (TIMEOUT_SEG). Si expira, receiveFrom() lanza
-    // SocketTimeoutException (ver más abajo) para que la capa superior
-    // decida retransmitir.
+    // Sets the receive timeout. Expiration raises SocketTimeoutException.
     void setTimeout(int segundos, int microsegundos = 0);
 
-    // Fija un "destino por defecto" para poder usar send() sin repetir
-    // host/puerto en cada llamada (típico en el emisor, que siempre le
-    // habla al mismo receptor).
+    // Sets the default destination used by send().
     void setDestino(const std::string& host, unsigned short puerto);
 
-    // ---- Envío ----------------------------------------------------------
+    // ---- Sending ---------------------------------------------------------
 
-    // Envía 'len' bytes al destino fijado previamente con setDestino().
-    // Devuelve la cantidad de bytes enviados.
+    // Sends len bytes to the destination configured with setDestino().
     int send(const void* datos, std::size_t len) const;
 
-    // Envía 'len' bytes a un host:puerto específico (sin necesidad de
-    // haber llamado setDestino()).
+    // Sends len bytes to a specific host and port.
     int sendTo(const void* datos, std::size_t len,
                const std::string& host, unsigned short puerto) const;
 
-    // ---- Recepción --------------------------------------------------------
+    // ---- Receiving --------------------------------------------------------
 
-    // Recibe hasta 'maxLen' bytes en 'buffer'. Si se configuró un timeout
-    // con setTimeout() y no llega nada a tiempo, lanza SocketTimeoutException.
-    // Devuelve la cantidad de bytes efectivamente recibidos.
-    // Si se pasan 'ipOrigen'/'puertoOrigen' (no nulos), se llenan con la
-    // dirección de quien envió el datagrama (imprescindible en el receptor,
-    // para poder contestar el ACK al remitente correcto).
+    // Receives up to maxLen bytes and optionally returns the sender address.
+    // A configured timeout raises SocketTimeoutException.
     int receiveFrom(void* buffer, std::size_t maxLen,
                      std::string* ipOrigen = nullptr,
                      unsigned short* puertoOrigen = nullptr) const;
 
-    // Cierra el socket explícitamente (el destructor también lo hace).
+    // Closes the socket explicitly.
     void close();
 
     int descriptor() const { return m_fd; }
@@ -98,10 +74,7 @@ private:
     bool m_tieneDestino;
 };
 
-// Excepción específica para cuando expira el timeout de recepción.
-// Hereda de SocketException para poder capturarla junto con las demás
-// si no interesa distinguir el caso, o por separado para implementar
-// la lógica de reintentos (MAX_REINTENTOS) del protocolo.
+// Exception raised when the receive timeout expires.
 class SocketTimeoutException : public SocketException
 {
 public:

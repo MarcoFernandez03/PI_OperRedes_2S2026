@@ -1,15 +1,10 @@
 // ejemplo_emisor.cpp
 //
-// Corre en el Raspberry Pi (cliente). Lee un archivo, lo divide en
-// fragmentos de hasta MAX_PAYLOAD bytes y los envía uno por uno,
-// esperando el ACK correspondiente antes de continuar, con timeout
-// y reintentos, siguiendo el flujo del emisor descrito en el protocolo.
+// Sends a file from the Raspberry Pi in acknowledged UDP fragments.
 //
-// En el proyecto real, en vez de leer un archivo, este mismo patrón de
-// envío se usaría con los datos que entrega el sensor a través de la
-// syscall que están implementando; la parte de sockets es idéntica.
+// The same flow can be used with sensor data instead of a file.
 //
-// Uso: ./ejemplo_emisor <ip_destino> <puerto_destino> <archivo_entrada>
+// Usage: ./ejemplo_emisor <destination_ip> <destination_port> <input_file>
 
 #include "UDPSocket.h"
 #include "Trama.h"
@@ -21,13 +16,11 @@
 
 namespace
 {
-    constexpr int TIMEOUT_SEG = 2;      // según el protocolo: 2 a 3 segundos
-    constexpr int MAX_REINTENTOS = 5;   // ajustar según lo acordado por el equipo
+    constexpr int TIMEOUT_SEG = 2;
+    constexpr int MAX_REINTENTOS = 5;
 }
 
-// Envía un fragmento (DATA o FIN) y espera su ACK, reintentando ante
-// timeout. Devuelve true si se confirmó, false si se agotaron los
-// reintentos (fallo de conexión).
+// Sends one DATA/FIN frame and retries until its ACK arrives.
 bool enviarFragmentoConfirmado(UDPSocket& socket, protocolo::TipoTrama tipo,
                                 uint32_t seq, const uint8_t* datos, uint16_t longitud)
 {
@@ -47,10 +40,9 @@ bool enviarFragmentoConfirmado(UDPSocket& socket, protocolo::TipoTrama tipo,
             protocolo::EncabezadoAck ack;
             if (protocolo::parsearTramaAck(bufferRespuesta.data(), recibidos, ack) && ack.seq == seq)
             {
-                return true; // ACK esperado recibido
+                return true; // Expected ACK received.
             }
-            // ACK con seq distinto al esperado: se ignora y se sigue
-            // esperando (o se agota el intento actual por timeout).
+            // Ignore ACKs for a different sequence number.
         }
         catch (const SocketTimeoutException&)
         {
@@ -59,7 +51,7 @@ bool enviarFragmentoConfirmado(UDPSocket& socket, protocolo::TipoTrama tipo,
         }
     }
 
-    return false; // se agotaron los reintentos -> fallo de conexión
+    return false; // Retry limit reached.
 }
 
 int main(int argc, char* argv[])

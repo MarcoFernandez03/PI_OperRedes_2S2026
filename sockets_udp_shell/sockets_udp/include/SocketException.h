@@ -3,11 +3,7 @@
 
 #include <string>
 
-// Excepción simple para errores de la capa de sockets.
-// Se usa el mismo patrón que en el ejemplo TCP (Tougher): cualquier
-// falla de una llamada al sistema (socket, bind, sendto, recvfrom...)
-// se reporta lanzando esta excepción con un mensaje descriptivo
-// (normalmente construido con errno / strerror).
+// Exception used to report socket-layer errors.
 class SocketException
 {
 public:
