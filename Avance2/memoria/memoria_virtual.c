@@ -3,6 +3,7 @@
 #include "tabla_paginas.h"
 #include "tlb.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 struct MemoriaVirtual {
     TLB tlb;
@@ -42,6 +43,13 @@ static uint32_t traducir(MemoriaVirtual *mv, uint32_t direccion_virtual, uint32_
     uint32_t pagina_virtual = direccion_virtual / mv->tam_pagina;
     uint32_t offset = direccion_virtual % mv->tam_pagina;
     uint32_t pagina_fisica;
+
+    if (pagina_virtual >= mv->num_paginas) {
+        fprintf(stderr,
+                "ERROR: direccion virtual %u fuera de rango (pagina %u >= num_paginas %u)\n",
+                direccion_virtual, pagina_virtual, mv->num_paginas);
+        exit(1);
+    }
 
     if (!tlb_buscar(&mv->tlb, pagina_virtual, &pagina_fisica)) {
         if (!tp_traducir(mv->tabla_paginas, pagina_virtual, &pagina_fisica)) {
