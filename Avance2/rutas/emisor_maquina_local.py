@@ -17,7 +17,8 @@ def enviar_datos(ip_destino: str, contenido: str):
         print(f"Enviado al enrutador: {msg}")
     finally:
         s.close()
+while True:
+    ip_destino = input("Ingrese la IP del receptor: ")
+    contenido = input("Ingrese el contenido del mensaje: ")
+    enviar_datos(ip_destino, contenido)
 
-# Ejemplo de uso
-if __name__ == "__main__":
-    enviar_datos("192.168.100.153", "Hola receptor, soy el emisor")
