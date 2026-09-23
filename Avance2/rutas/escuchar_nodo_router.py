@@ -5,6 +5,10 @@ import psutil
 import select
 import sys
 
+from tabla_rutas import TablaRutas
+from logica_rutas import procesar_announce, procesar_advertise, procesar_data
+
+
 PUERTO_UDP = 5005
 PUERTO_TCP = 5006
 
@@ -18,6 +22,10 @@ if len(sys.argv) < 2:
 
 IP_PROPIA = sys.argv[1] # La IP propia es para no apuntarnos a nosotros mismo con broadcast
 IP_CONOCIDAS = sys.argv[2:] # Esto es pruebas, estas ip hay que pasarlas a la tabla
+
+# Tabla de rutas respaldada por la memoria virtual (TLB + tabla de páginas + memoria física)
+tabla = TablaRutas()
+
 
 # Socket UDP
 s_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -40,42 +48,101 @@ def reenviar_datos(ip_destino: str, contenido: str):
     finally:
         s.close()
 
-
+def propagar_advertise(ip_a_propagar: str, ip_excluir: str):
+    """Envía ADVERTISE|ip_a_propagar por TCP unicast a todos los vecinos
+    conocidos, excepto a quien nos la mandó (para no devolvérsela)."""
+    mensaje = f"{PREFIJO_PROPAGAR}{ip_a_propagar}"
+    for ip_vecino in IP_CONOCIDAS:
+        if ip_vecino == ip_excluir:
+            continue
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect((ip_vecino, PUERTO_TCP))
+            s.sendall(mensaje.encode())
+            print(f"Propagado a {ip_vecino}: {mensaje}")
+        except OSError as e:
+            print(f"No se pudo propagar a {ip_vecino}: {e}")
+        finally:
+            s.close()
+ 
+ 
+def transportar_datos(ip_siguiente_salto: str, ip_destino_final: str, contenido: str):
+    """
+    Envía un fragmento DATA al siguiente salto (no necesariamente al
+    destino final; puede ser un router intermedio). El mensaje conserva
+    el destino final para que, si el siguiente salto no es el destino,
+    lo siga reenviando.
+ 
+    NOTA: por ahora usa TCP simple, igual que ADVERTISE, para poder
+    probar el enrutamiento primero. Cuando se migre al transporte
+    confiable de la Etapa 1 (UDP + syscall del kernel), solo hay que
+    cambiar el cuerpo de esta función — la firma y quién la llama no
+    cambian.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((ip_siguiente_salto, PUERTO_TCP))
+        msg = f"{PREFIJO_DATOS}{ip_destino_final}|{contenido}"
+        s.sendall(msg.encode())
+        print(f"Reenviado a {ip_siguiente_salto} (destino final {ip_destino_final}): {msg}")
+    finally:
+        s.close()
+ 
+ 
 print(f"Escuchando en UDP {PUERTO_UDP} y TCP {PUERTO_TCP}...\n")
-
+ 
 while True:
     # Esperar actividad en cualquiera de los sockets
     readable, _, _ = select.select([s_udp, s_tcp], [], [])
-
+ 
     for sock in readable:
         if sock is s_udp:
             data, remitente = s_udp.recvfrom(1024)
             msg = data.decode(errors="replace")
-
+ 
             if msg.startswith(PREFIJO_ANUNCIO):
                 print(f"{remitente[0]:16} -> {msg}")
-                # Separar los campos: prefijo, ip_vecino
-                _, ip_vecino = msg.split("|", 1) # Esto se podría quitar ya que la ip viene en remitente[0]
-                # Aquí hace falta añadir la ip guardada en el campo
-                # remitente a la tabla de direccionamiento y programar la propagación 
-
+ 
+                # La IP real del vecino es remitente[0] (el campo del mensaje
+                # no hace falta para esto: lo da el socket, no el payload).
+                ip_a_propagar = procesar_announce(remitente[0], IP_PROPIA, tabla)
+                if ip_a_propagar is not None:
+                    print(f"Nueva ruta directa: {ip_a_propagar} (vecino)")
+                    propagar_advertise(ip_a_propagar, ip_excluir=ip_a_propagar)
+ 
         elif sock is s_tcp:
             conn, remitente = s_tcp.accept()
             data = conn.recv(1024)
             msg = data.decode(errors="replace")
-
+ 
             if msg.startswith(PREFIJO_PROPAGAR):
                 print(f"{remitente[0]:16} -> {msg}")
+ 
+                ip_a_repropagar = procesar_advertise(msg, remitente[0], IP_PROPIA, tabla)
+                if ip_a_repropagar is not None:
+                    print(f"Nueva ruta vía {remitente[0]}: {ip_a_repropagar}")
+                    propagar_advertise(ip_a_repropagar, ip_excluir=remitente[0])
+ 
             elif msg.startswith(PREFIJO_DATOS):
                 print(f"{remitente[0]:16} -> {msg}")
-                try:
-                    # Separar los campos: prefijo, ip_destino, contenido
-                    _, ip_destino, contenido = msg.split("|", 2)
-                    
-                    if ip_destino in IP_CONOCIDAS: # Esto es solo el check de prueba, cambiar por la ip traída de la tabla
-                        reenviar_datos(ip_destino, contenido)
-
-                except ValueError:
+ 
+                resultado = procesar_data(msg, IP_PROPIA, tabla)
+ 
+                if resultado[0] == "local":
+                    _, contenido = resultado
+                    print(f"Datos entregados localmente: {contenido}")
+                    # TODO (fuera del alcance de esta etapa): entregarlo a
+                    # receptor_maquina_local.py si el destino es esta Pi.
+ 
+                elif resultado[0] == "reenviar":
+                    _, ip_siguiente_salto, ip_destino_final, contenido = resultado
+                    transportar_datos(ip_siguiente_salto, ip_destino_final, contenido)
+ 
+                elif resultado[0] == "sin_ruta":
+                    _, ip_destino = resultado
+                    print(f"Sin ruta conocida hacia {ip_destino}, se descarta")
+ 
+                elif resultado[0] == "formato_invalido":
                     print("Formato inválido en DATA")
-
+ 
             conn.close()
