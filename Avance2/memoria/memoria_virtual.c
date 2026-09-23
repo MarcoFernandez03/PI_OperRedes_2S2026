@@ -17,6 +17,12 @@ MemoriaVirtual* mv_crear(uint32_t tam_pagina, uint32_t num_paginas) {
     MemoriaVirtual *mv = malloc(sizeof(MemoriaVirtual));
     if (!mv) return NULL;
 
+    size_t tam_total_bytes = (size_t)tam_pagina * (size_t)num_paginas;
+    if (!mf_init(tam_total_bytes)) {
+        free(mv);
+        return NULL;
+    }
+
     mv->tabla_paginas = tp_crear(num_paginas);
     if (!mv->tabla_paginas) {
         free(mv);
@@ -34,6 +40,7 @@ MemoriaVirtual* mv_crear(uint32_t tam_pagina, uint32_t num_paginas) {
 void mv_destruir(MemoriaVirtual *mv) {
     if (!mv) return;
     tp_destruir(mv->tabla_paginas);
+    mf_destroy();
     free(mv);
 }
 
