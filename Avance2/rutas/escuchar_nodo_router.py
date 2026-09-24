@@ -17,11 +17,12 @@ PREFIJO_PROPAGAR = "ADVERTISE|"
 PREFIJO_DATOS = "DATA|"
 
 if len(sys.argv) < 2:
-    print("Uso: python escuchar.py <IP_PROPIA> [IP_CONOCIDAS...]")
+    print("Uso: python escuchar_nodo_router.py <IP_PROPIA> [IPS_LOCALES...]")
     sys.exit(1)
 
 IP_PROPIA = sys.argv[1] # La IP propia es para no apuntarnos a nosotros mismo con broadcast
-IP_CONOCIDAS = sys.argv[2:] # Esto es pruebas, estas ip hay que pasarlas a la tabla
+IPS_LOCALES = sys.argv[2:]
+IP_VECINOS = {} # Tenemos que popular esta tabla con que interfaz le pertenece a cada vecino, para poder reenviar por la interfaz que toca
 
 # Tabla de rutas respaldada por la memoria virtual (TLB + tabla de páginas + memoria física)
 tabla = TablaRutas()
@@ -38,6 +39,14 @@ s_tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s_tcp.bind(("", PUERTO_TCP))
 s_tcp.listen(5) # Cola de conexiones entrantes
 
+# Esto se usa para conseguir al router al que 
+# hay que darle el paquete enviar al ser dueño de la interfaz
+def get_ip_vecino(interfaz: str) -> str:
+    for ip, interfaces in IP_VECINOS.items():
+        if interfaces == interfaz:
+            return ip
+    return None
+
 def reenviar_datos(ip_destino: str, contenido: str):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -48,11 +57,22 @@ def reenviar_datos(ip_destino: str, contenido: str):
     finally:
         s.close()
 
+def reenviar_datos_interfaz(ip_destino: str, contenido: str, interfaz: str):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, interfaz.encode())
+    try:
+        s.connect((get_ip_vecino(interfaz), PUERTO_TCP))
+        msg = f"{PREFIJO_DATOS}{ip_destino}|{contenido}"
+        s.sendall(msg.encode())
+        print(f"Reenviado a {ip_destino}: {msg}")
+    finally:
+        s.close()
+
 def propagar_advertise(ip_a_propagar: str, ip_excluir: str):
     """Envía ADVERTISE|ip_a_propagar por TCP unicast a todos los vecinos
     conocidos, excepto a quien nos la mandó (para no devolvérsela)."""
     mensaje = f"{PREFIJO_PROPAGAR}{ip_a_propagar}"
-    for ip_vecino in IP_CONOCIDAS:
+    for ip_vecino in IP_VECINOS:
         if ip_vecino == ip_excluir:
             continue
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -87,6 +107,13 @@ def transportar_datos(ip_siguiente_salto: str, ip_destino_final: str, contenido:
         print(f"Reenviado a {ip_siguiente_salto} (destino final {ip_destino_final}): {msg}")
     finally:
         s.close()
+
+def obtener_interfaz(ip: str) -> str:
+    for interfaz, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.address == ip:
+                return interfaz
+    return "Desconocida"
  
  
 print(f"Escuchando en UDP {PUERTO_UDP} y TCP {PUERTO_TCP}...\n")
@@ -102,7 +129,7 @@ while True:
  
             if msg.startswith(PREFIJO_ANUNCIO):
                 print(f"{remitente[0]:16} -> {msg}")
- 
+                IP_VECINOS[remitente[0]] = "" # Guardar el vecino
                 # La IP real del vecino es remitente[0] (el campo del mensaje
                 # no hace falta para esto: lo da el socket, no el payload).
                 ip_a_propagar = procesar_announce(remitente[0], IP_PROPIA, tabla)
@@ -117,7 +144,7 @@ while True:
  
             if msg.startswith(PREFIJO_PROPAGAR):
                 print(f"{remitente[0]:16} -> {msg}")
- 
+                IP_VECINOS[remitente[0]] = obtener_interfaz(conn.getsockname()[0]) # Guardar interfaz del vecino
                 ip_a_repropagar = procesar_advertise(msg, remitente[0], IP_PROPIA, tabla)
                 if ip_a_repropagar is not None:
                     print(f"Nueva ruta vía {remitente[0]}: {ip_a_repropagar}")
@@ -126,17 +153,16 @@ while True:
             elif msg.startswith(PREFIJO_DATOS):
                 print(f"{remitente[0]:16} -> {msg}")
  
-                resultado = procesar_data(msg, IP_PROPIA, tabla)
+                resultado = procesar_data(msg, IPS_LOCALES, tabla)
  
                 if resultado[0] == "local":
-                    _, contenido = resultado
+                    _, ip_destino, contenido = resultado
+                    reenviar_datos(ip_destino, contenido)
                     print(f"Datos entregados localmente: {contenido}")
-                    # TODO (fuera del alcance de esta etapa): entregarlo a
-                    # receptor_maquina_local.py si el destino es esta Pi.
  
                 elif resultado[0] == "reenviar":
-                    _, ip_siguiente_salto, ip_destino_final, contenido = resultado
-                    transportar_datos(ip_siguiente_salto, ip_destino_final, contenido)
+                    _, interfaz, ip_destino, contenido = resultado
+                    reenviar_datos_interfaz(ip_destino, contenido, interfaz)
  
                 elif resultado[0] == "sin_ruta":
                     _, ip_destino = resultado

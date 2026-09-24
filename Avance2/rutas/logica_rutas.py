@@ -57,15 +57,18 @@ def procesar_advertise(msg: str, ip_remitente: str, ip_propia: str,
 #   ("reenviar", ip_siguiente_salto, ip_destino, contenido) -> reenviar
 #   ("sin_ruta", ip_destino)                       -> no hay ruta conocida
 #   ("formato_invalido", None)                     -> mensaje mal formado
-def procesar_data(msg: str, ip_propia: str, tabla: TablaRutas) -> Tuple:
+def procesar_data(msg: str, ips_locales: list, tabla: TablaRutas) -> Tuple:
     try:
         _, ip_destino, contenido = msg.split("|", 2)
     except ValueError:
         return ("formato_invalido", None)
 
-    if ip_destino == ip_propia:
-        return ("local", contenido)
+    if ip_destino in ips_locales:
+        return ("local", ip_destino, contenido)
 
+    # TODO: Esto es lo que hay que cambiar por interfaz
+    # también podemos simplificar y enviar interfaz + ip router vecino
+    # para quitar esa parte de escuchar_nodo_router.py
     siguiente_salto = tabla.buscar_siguiente_salto(ip_destino)
     if siguiente_salto is not None:
         return ("reenviar", siguiente_salto, ip_destino, contenido)
