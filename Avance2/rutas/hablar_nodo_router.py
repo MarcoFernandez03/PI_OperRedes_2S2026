@@ -4,7 +4,7 @@ import socket
 import time
 
 PUERTO = 5005
-GRUPO = "SHELL"        # <-- pongan el suyo
+GRUPO = "10.1.35.23"        # <-- pongan el suyo
 
 # TODO 1: averiguar su dirección de broadcast.
 #   Corran el script de interfaces, tomen su IP
@@ -12,7 +12,7 @@ GRUPO = "SHELL"        # <-- pongan el suyo
 #   de SU subred. Escriban en un comentario cómo la obtuvieron.
 #   Con ayuda del script interfaces.py se miró la ip privada correspondiente
 #   a la maquina y se tomó su dirección broadcast
-DESTINO = "10.0.2.255" # Esto hay que cambiarlo por la dirección de broadcast de la pi
+DESTINO = "192.168.100.255" # Esto hay que cambiarlo por la dirección de broadcast de la pi
 
 # TODO 2: crear el socket (igual que en el listener).
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -29,7 +29,7 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 for i in range(3):
   # TODO 4: armar el mensaje.
   #   Mínimo debe permitir que quien lo reciba sepa QUIÉN lo envió.
-  msg = f"ANNOUNCE|{GRUPO}|Marco"
+  msg = f"ANNOUNCE|{GRUPO}"
 
   # TODO 5: enviarlo.
   #   El método de envío para datagramas necesita DOS argumentos.

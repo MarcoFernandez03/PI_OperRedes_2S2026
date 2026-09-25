@@ -3,7 +3,7 @@
 import socket
 import psutil
 
-PUERTO_TCP = 5006
+PUERTO_TCP = 5005
 
 PREFIJO_DATOS = "DATA|"
 

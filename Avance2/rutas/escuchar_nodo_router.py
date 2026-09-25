@@ -10,7 +10,7 @@ from logica_rutas import procesar_announce, procesar_advertise, procesar_data
 
 
 PUERTO_UDP = 5005
-PUERTO_TCP = 5006
+PUERTO_TCP = 5005
 
 PREFIJO_ANUNCIO = "ANNOUNCE|"
 PREFIJO_PROPAGAR = "ADVERTISE|"
@@ -54,6 +54,8 @@ def reenviar_datos(ip_destino: str, contenido: str):
         msg = f"{PREFIJO_DATOS}{ip_destino}|{contenido}"
         s.sendall(msg.encode())
         print(f"Reenviado a {ip_destino}: {msg}")
+    except OSError as e:
+        print(f"No se pudo reenviar a {ip_destino}: {e}")
     finally:
         s.close()
 
@@ -84,8 +86,37 @@ def propagar_advertise(ip_a_propagar: str, ip_excluir: str):
             print(f"No se pudo propagar a {ip_vecino}: {e}")
         finally:
             s.close()
- 
- 
+
+def enviar_tabla(ip_vecino: str):
+    """Envía por TCP unicast un ADVERTISE por cada ruta conocida a un
+    vecino recién descubierto, para que aprenda toda la tabla."""
+    # Anunciar todas las IP locales
+    for ip_local in IPS_LOCALES:
+        mensaje = f"{PREFIJO_PROPAGAR}{ip_local}"
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect((ip_vecino, PUERTO_TCP))
+            s.sendall(mensaje.encode())
+            print(f"IP local enviada a {ip_vecino}: {mensaje}")
+        finally:
+            s.close()
+    
+    
+    for ip_destino, siguiente_salto in tabla.todas_las_rutas():
+        if ip_destino == ip_vecino or siguiente_salto == ip_vecino:
+            continue
+        mensaje = f"{PREFIJO_PROPAGAR}{ip_destino}"
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect((ip_vecino, PUERTO_TCP))
+            s.sendall(mensaje.encode())
+            print(f"Tabla enviada a {ip_vecino}: {mensaje}")
+        except OSError as e:
+            print(f"No se pudo enviar tabla a {ip_vecino}: {e}")
+        finally:
+            s.close()
+
+
 def transportar_datos(ip_siguiente_salto: str, ip_destino_final: str, contenido: str):
     """
     Envía un fragmento DATA al siguiente salto (no necesariamente al
@@ -105,6 +136,8 @@ def transportar_datos(ip_siguiente_salto: str, ip_destino_final: str, contenido:
         msg = f"{PREFIJO_DATOS}{ip_destino_final}|{contenido}"
         s.sendall(msg.encode())
         print(f"Reenviado a {ip_siguiente_salto} (destino final {ip_destino_final}): {msg}")
+    except OSError as e:
+        print(f"No se pudo reenviar a {ip_siguiente_salto}: {e}")
     finally:
         s.close()
 
@@ -127,8 +160,12 @@ while True:
             data, remitente = s_udp.recvfrom(1024)
             msg = data.decode(errors="replace")
  
-            if msg.startswith(PREFIJO_ANUNCIO):
+            if msg.startswith(PREFIJO_ANUNCIO) and remitente[0] != IP_PROPIA:
                 print(f"{remitente[0]:16} -> {msg}")
+                if remitente[0] not in IP_VECINOS:
+                    # Vecino nuevo: se le responde el ANNOUNCE (descubrimiento mutuo)
+                    s_udp.sendto(f"{PREFIJO_ANUNCIO}{IP_PROPIA}".encode(), (remitente[0], PUERTO_UDP))
+                    enviar_tabla(remitente[0])
                 IP_VECINOS[remitente[0]] = "" # Guardar el vecino
                 # La IP real del vecino es remitente[0] (el campo del mensaje
                 # no hace falta para esto: lo da el socket, no el payload).
@@ -161,8 +198,8 @@ while True:
                     print(f"Datos entregados localmente: {contenido}")
  
                 elif resultado[0] == "reenviar":
-                    _, interfaz, ip_destino, contenido = resultado
-                    reenviar_datos_interfaz(ip_destino, contenido, interfaz)
+                    _, ip_siguiente_salto, ip_destino, contenido = resultado
+                    transportar_datos(ip_siguiente_salto, ip_destino, contenido)
  
                 elif resultado[0] == "sin_ruta":
                     _, ip_destino = resultado

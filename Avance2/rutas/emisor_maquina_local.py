@@ -2,7 +2,7 @@
 
 import socket
 
-PUERTO_TCP = 5006
+PUERTO_TCP = 5005
 PREFIJO_DATOS = "DATA|"
 
 # Dirección IP del nodo enrutador
