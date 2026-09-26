@@ -2,11 +2,11 @@
 
 import socket
 
-PUERTO_TCP = 5005
+PUERTO_TCP = 5006
 PREFIJO_DATOS = "DATA|"
 
 # Dirección IP del nodo enrutador
-IP_ENRUTADOR = "192.168.100.16"
+IP_ENRUTADOR = "192.168.100.153"
 
 def enviar_datos(ip_destino: str, contenido: str):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
