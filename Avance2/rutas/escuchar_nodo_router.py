@@ -152,9 +152,9 @@ while True:
                 # no hace falta para esto: lo da el socket, no el payload).
                 # POSIBLE BORRAR
                 ip_a_propagar = procesar_announce(remitente[0], IP_PROPIA, tabla)
-                if ip_a_propagar is not None:
-                    print(f"Nueva ruta directa: {ip_a_propagar} (vecino)")
-                    propagar_advertise(ip_a_propagar, ip_excluir=ip_a_propagar)
+                #if ip_a_propagar is not None:
+                    #print(f"Nueva ruta directa: {ip_a_propagar} (vecino)")
+                    #propagar_advertise(ip_a_propagar, ip_excluir=ip_a_propagar)
                 # POSIBLE BORRAR
  
         elif sock is s_tcp or sock is s_tcp_local:
@@ -164,10 +164,10 @@ while True:
  
             if msg.startswith(PREFIJO_PROPAGAR):
                 print(f"{remitente[0]:16} -> {msg}")
-                ip_a_repropagar = procesar_advertise(msg, remitente[0], IP_PROPIA, tabla)
-                if ip_a_repropagar is not None:
-                    print(f"Nueva ruta vía {remitente[0]}: {ip_a_repropagar}")
-                    propagar_advertise(ip_a_repropagar, ip_excluir=remitente[0])
+                #ip_a_repropagar = procesar_advertise(msg, remitente[0], IP_PROPIA, tabla)
+                #if ip_a_repropagar is not None:
+                   # print(f"Nueva ruta vía {remitente[0]}: {ip_a_repropagar}")
+                procesar_advertise(msg, remitente[0], IP_PROPIA, tabla)
  
             elif msg.startswith(PREFIJO_DATOS):
                 print(f"{remitente[0]:16} -> {msg}")
