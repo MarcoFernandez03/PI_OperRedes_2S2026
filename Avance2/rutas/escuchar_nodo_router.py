@@ -135,28 +135,14 @@ while True:
         if sock is s_udp:
             data, remitente = s_udp.recvfrom(1024)
             msg = data.decode(errors="replace")
- 
+
             if msg.startswith(PREFIJO_ANUNCIO) and remitente[0] != IP_PROPIA:
                 print(f"{remitente[0]:16} -> {msg}")
-                if remitente[0] not in IP_VECINOS:
-                    # Vecino nuevo: se le responde el ANNOUNCE (descubrimiento mutuo)
-                    s_udp.sendto(f"{PREFIJO_ANUNCIO}{IP_PROPIA}".encode(), (remitente[0], PUERTO_UDP))
-                    enviar_tabla(remitente[0])
-                    IP_VECINOS[remitente[0]] = 1 # Guardar el vecino y marcar que enviamos su ANNOUNCE
-                elif remitente[0] in IP_VECINOS:
-                    if IP_VECINOS[remitente[0]] == 0:
-                        enviar_tabla(remitente[0])
-                        IP_VECINOS[remitente[0]] = 1 # Guardar el vecino y marcar que enviamos su ANNOUNCE
-                    
-                # La IP real del vecino es remitente[0] (el campo del mensaje
-                # no hace falta para esto: lo da el socket, no el payload).
-                # POSIBLE BORRAR
-                ip_a_propagar = procesar_announce(remitente[0], IP_PROPIA, tabla)
-                #if ip_a_propagar is not None:
-                    #print(f"Nueva ruta directa: {ip_a_propagar} (vecino)")
-                    #propagar_advertise(ip_a_propagar, ip_excluir=ip_a_propagar)
-                # POSIBLE BORRAR
- 
+                # Vecino nuevo: se le responde el ANNOUNCE (descubrimiento mutuo)
+                s_udp.sendto(f"{PREFIJO_ANUNCIO}{IP_PROPIA}".encode(), (remitente[0], PUERTO_UDP))
+                enviar_tabla(remitente[0])
+                # ip_a_propagar = procesar_announce(remitente[0], IP_PROPIA, tabla)
+                
         elif sock is s_tcp or sock is s_tcp_local:
             conn, remitente = sock.accept()
             data = conn.recv(1024)
