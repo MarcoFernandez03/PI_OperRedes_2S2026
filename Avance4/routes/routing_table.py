@@ -33,40 +33,28 @@ class RoutingTable:
         data = _ip_to_bytes(destination_ip) + _ip_to_bytes(next_hop_ip)
         self._vm.write_bytes(self._table[index], data)
 
-    def create_route(self, destination_ip: str, next_hop_ip: str) -> bool:
-        """Crea una nueva ruta en la tabla de enrutamiento.
+    def add_route(self, destination_ip: str, next_hop_ip: str) -> bool:
+        """Agrega una ruta a la tabla de enrutamiento. Si la ruta ya existe, se actualiza.
         
         Args
             destination_ip (str): Direccion IP destino.
             next_hop_ip (str): Direccion IP de siguiente salto.
         
         Returns
-            bool: True si la ruta fue creada exitosamente, False si la ruta ya existe o si no hay espacio disponible en la memoria virtual.
-        """
-        slot_address = self._vm.allocate(ROUTE_SIZE)
-        if slot_address is None:
-            return False
-        self._table.append(slot_address)
-        self._write_slot(len(self._table) - 1, destination_ip, next_hop_ip)
-        return True
-
-    def update_route(self, destination_ip: str, next_hop_ip: str) -> bool:
-        """Actualiza la ruta existente en la tabla de enrutamiento.
-        
-        Args
-            destination_ip (str): Direccion IP destino.
-            next_hop_ip (str): Direccion IP de siguiente salto.
-        
-        Returns
-            bool: True si la ruta fue actualizada exitosamente, False si la ruta no existe.
+            bool: True si la ruta fue agregada o actualizada exitosamente, False si no hay espacio disponible en la memoria virtual.
         """
         slot_index = self._find_slot(destination_ip)
-        if slot_index is not None:
-            self._write_slot(slot_index, destination_ip, next_hop_ip)
-            return True
-        return False
+        if slot_index is None:
+            slot_address = self._vm.allocate(ROUTE_SIZE)
+            if slot_address is None:
+                return False
+            self._table.append(slot_address)
+            slot_index = len(self._table) - 1
+        
+        self._write_slot(slot_index, destination_ip, next_hop_ip)
+        return True
 
-    def delete_route(self, destination_ip: str) -> bool:
+    def remove_route(self, destination_ip: str) -> bool:
         """Elimina una ruta de la tabla de enrutamiento.
         
         Args
