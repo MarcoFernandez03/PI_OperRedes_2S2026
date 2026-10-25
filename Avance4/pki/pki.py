@@ -76,7 +76,50 @@ def cert_a_b64(cert):
 def cert_desde_b64(texto):
     return x509.load_der_x509_certificate(base64.b64decode(texto, validate=True))
 
+def _ext_raiz_ok(raiz):
+    try:
+        bc = raiz.extensions.get_extension_for_class(x509.BasicConstraints)
+        ku = raiz.extensions.get_extension_for_class(x509.KeyUsage)
+    except x509.ExtensionNotFound:
+        return False
+    return (bc.critical and bc.value.ca and ku.critical
+            and ku.value.key_cert_sign)
 
- # ————————————————————————
-if __name__ == "__main__":
-    print(generar_nodo("SHELL", 65003, 17, "out"))
+
+def _ext_nodo_ok(cert):
+    try:
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints)
+        ku = cert.extensions.get_extension_for_class(x509.KeyUsage)
+    except x509.ExtensionNotFound:
+        return False
+    return (bc.critical and not bc.value.ca and ku.critical
+            and ku.value.digital_signature)
+
+def validar_cadena(cert, raices, ahora=None):
+    t = ahora if ahora is not None else time.time()
+    ahora_dt = datetime.fromtimestamp(t, tz=timezone.utc)
+
+    if not (cert.not_valid_before_utc <= ahora_dt <= cert.not_valid_after_utc):
+        return False, "certificado del nodo fuera de vigencia"
+    if not _ext_nodo_ok(cert):
+        return False, "extensiones del certificado del nodo incorrectas"
+
+    motivo = "emisor no está en el truststore"
+    for raiz in raices:
+        if raiz.subject != cert.issuer:
+            continue
+        if not (raiz.not_valid_before_utc <= ahora_dt <= raiz.not_valid_after_utc):
+            motivo = "raíz fuera de vigencia"
+            continue
+        if not _ext_raiz_ok(raiz):
+            motivo = "extensiones de la raíz incorrectas"
+            continue
+        try:
+            raiz.public_key().verify(cert.signature, cert.tbs_certificate_bytes,
+                                     padding.PKCS1v15(),
+                                     cert.signature_hash_algorithm)
+        except InvalidSignature:
+            motivo = "la firma del certificado no verifica con la raíz"
+            continue
+        return True, "ok"
+    return False, motivo

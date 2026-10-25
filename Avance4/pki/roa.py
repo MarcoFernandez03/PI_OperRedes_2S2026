@@ -2,6 +2,9 @@ import base64
 import ipaddress
 import time
 
+from pki import validar_cadena
+from cryptography.x509.oid import NameOID
+
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -48,12 +51,33 @@ def verificar_firma(roa, cert):
     except (InvalidSignature, ValueError):
         return False
 
-if __name__ == "__main__":
-    linea = crear_roa("10.1.0.5", 65003, 17, "out/AS65003-17.key", 3600)
-    print(linea)
-    roa = parsear_roa(linea)
-    with open("out/AS65003-17.crt", "rb") as f:
-        cert = x509.load_pem_x509_certificate(f.read())
-    print("firma ok:", verificar_firma(roa, cert))
-    roa["mensaje"] = roa["mensaje"].replace("10.1.0.5", "10.1.0.6")
-    print("alterado:", verificar_firma(roa, cert))
+def _cn(cert):
+    return cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+
+
+def verificar_roa(linea, cert, raices, ahora=None):
+    t = ahora if ahora is not None else time.time()
+
+    try:
+        roa = parsear_roa(linea)
+    except ValueError as e:
+        return False, f"formato inválido: {e}"
+
+    if not (roa["emision"] <= t <= roa["vence"]):
+        return False, "ROA fuera de su rango EMISION-VENCE"
+
+    ok, motivo = validar_cadena(cert, raices, t)
+    if not ok:
+        return False, f"certificado no válido: {motivo}"
+
+    esperado = f"AS{roa['isla']}-{roa['num_emisor']}"
+    if _cn(cert) != esperado:
+        return False, f"CN {_cn(cert)} no coincide con {esperado}"
+
+    if roa["vence"] > cert.not_valid_after_utc.timestamp():
+        return False, "VENCE es posterior al notAfter del certificado"
+
+    if not verificar_firma(roa, cert):
+        return False, "la firma no verifica"
+
+    return True, "ok"
