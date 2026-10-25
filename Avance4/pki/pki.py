@@ -31,3 +31,6 @@ def generar_ca(equipo, directorio, cnf="ca-ext.cnf"):
 
     _openssl(["verify", "-CAfile", crt, crt])
     return key, crt
+
+if __name__ == "__main__":
+    print(generar_ca("SHELL", "out"))
