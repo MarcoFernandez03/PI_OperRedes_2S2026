@@ -23,3 +23,20 @@ Un ROA es una línea de texto que dice “la IP 10.1.0.5 pertenece a la isla 650
 ---
 
 ## Brainstorming
+
+Para el punto A... Tengo que hacer un script que llame a openssl como si fuera bash. Esto lo puedo usar con subprocess y cryptography para la encriptación a Base64. 
+
+El script va a recibir parámetros para el certificado: nombre del equipo, ISLA, NUM_EMISOR
+Y la salida va a ser: ca-<Equipo>.key / .crt / nodo.key / nodo.csr / nodo.crt. Lo de la tarea de PI que ya hicimos. 
+
+## Resumen del Flujo:
+
+[Una vez]   setup  →  CA + certificado del nodo (archivos .key/.crt)
+                              │
+[Cada 60 s] crear_roa()  ←── usa nodo.key
+                │
+                ▼
+           línea ROA firmada  ──►  repositorio (P2)  ──►  enrutador (P3)
+                                                              │
+                                    verificar_roa()  ◄────────┘
+                                    (usa nodo.crt + truststore)
