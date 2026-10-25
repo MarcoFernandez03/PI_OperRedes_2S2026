@@ -38,3 +38,12 @@ def parsear_roa(linea):
         "firma": firma,
         "mensaje": "|".join(partes[:6]),
     }
+
+def verificar_firma(roa, cert):
+    try:
+        firma = base64.b64decode(roa["firma"], validate=True)
+        cert.public_key().verify(firma, roa["mensaje"].encode(),
+                                 padding.PKCS1v15(), hashes.SHA256())
+        return True
+    except (InvalidSignature, ValueError):
+        return False
