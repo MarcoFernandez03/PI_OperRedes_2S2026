@@ -64,3 +64,7 @@ def actualizar_truststore(carpeta, ruta_huellas, destino):
             os.unlink(tmp)
             raise
         return aceptadas, rechazadas
+    
+if __name__ == "__main__":
+    print(actualizar_truststore("trust-anchors", "fingerprints.txt",
+                                "out/trusted-roots.pem"))
