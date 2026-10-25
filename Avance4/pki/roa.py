@@ -22,3 +22,19 @@ def crear_roa(ip, isla, num_emisor, ruta_llave, vigencia, ahora=None):
     firma_b64 = base64.b64encode(firma).decode()
 
     return f"{mensaje}|{firma_b64}"
+
+def parsear_roa(linea):
+    partes = linea.rstrip("\n").split("|")
+    if len(partes) != 7 or partes[0] != "ROA":
+        raise ValueError("ROA debe tener 7 campos y empezar con 'ROA'")
+    _, ip, isla, num_emisor, emision, vence, firma = partes
+    ipaddress.IPv4Address(ip)
+    return {
+        "ip": ip,
+        "isla": int(isla),
+        "num_emisor": int(num_emisor),
+        "emision": int(emision),
+        "vence": int(vence),
+        "firma": firma,
+        "mensaje": "|".join(partes[:6]),
+    }
