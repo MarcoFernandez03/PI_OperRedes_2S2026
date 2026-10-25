@@ -1,5 +1,13 @@
+import base64
 import os
 import subprocess
+import time
+from datetime import datetime, timezone
+
+from cryptography import x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 
 DIAS_CA = 1825
 DIAS_NODO = 365
@@ -56,6 +64,18 @@ def generar_nodo(equipo, isla, num_emisor, directorio, cnf="nodo-ext.cnf"):
 
     _openssl(["verify", "-CAfile", ca_crt, crt])
     return key, crt
+
+def cargar_truststore(ruta):
+    with open(ruta, "rb") as f:
+        return x509.load_pem_x509_certificates(f.read())
+
+def cert_a_b64(cert):
+    der = cert.public_bytes(serialization.Encoding.DER)
+    return base64.b64encode(der).decode()
+
+def cert_desde_b64(texto):
+    return x509.load_der_x509_certificate(base64.b64decode(texto, validate=True))
+
 
  # ————————————————————————
 if __name__ == "__main__":
