@@ -47,3 +47,13 @@ def verificar_firma(roa, cert):
         return True
     except (InvalidSignature, ValueError):
         return False
+
+if __name__ == "__main__":
+    linea = crear_roa("10.1.0.5", 65003, 17, "out/AS65003-17.key", 3600)
+    print(linea)
+    roa = parsear_roa(linea)
+    with open("out/AS65003-17.crt", "rb") as f:
+        cert = x509.load_pem_x509_certificate(f.read())
+    print("firma ok:", verificar_firma(roa, cert))
+    roa["mensaje"] = roa["mensaje"].replace("10.1.0.5", "10.1.0.6")
+    print("alterado:", verificar_firma(roa, cert))
