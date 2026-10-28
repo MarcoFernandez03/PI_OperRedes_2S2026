@@ -14,7 +14,7 @@ TOTAL_BYTES = TOTAL_SECTORES * BYTES_POR_SECTOR
 
 class Disco:
     def __init__(self):
-        self.almacenamiento = bytearray(TOTAL_BYTES)
+        self._almacenamiento = bytearray(TOTAL_BYTES)
     
     def leer_sector(self, sector: int) -> bytes:
         """Lee un sector del disco. Devuelve exactamente BYTES_POR_SECTOR bytes.
@@ -29,7 +29,7 @@ class Disco:
             ValueError: Si el número de sector está fuera de rango.
         """
         self._validar_indice(sector)
-        return bytes(self.almacenamiento[sector * BYTES_POR_SECTOR:(sector + 1) * BYTES_POR_SECTOR])
+        return bytes(self._almacenamiento[sector * BYTES_POR_SECTOR:(sector + 1) * BYTES_POR_SECTOR])
     
     def escribir_sector(self, sector: int, datos: bytes) -> None:
         """Escribe un sector del disco. Los datos deben tener exactamente BYTES_POR_SECTOR bytes.
@@ -44,7 +44,7 @@ class Disco:
         self._validar_indice(sector)
         if len(datos) != BYTES_POR_SECTOR:
             raise ValueError(f"Los datos deben tener exactamente {BYTES_POR_SECTOR} bytes")
-        self.almacenamiento[sector * BYTES_POR_SECTOR:(sector + 1) * BYTES_POR_SECTOR] = datos
+        self._almacenamiento[sector * BYTES_POR_SECTOR:(sector + 1) * BYTES_POR_SECTOR] = datos
     
     def leer_bloque(self, bloque: int) -> bytes:
         """Lee un bloque del disco. Devuelve exactamente BYTES_POR_BLOQUE bytes.
@@ -59,7 +59,7 @@ class Disco:
             ValueError: Si el número de bloque está fuera de rango.
         """
         self._validar_indice(bloque * SECTORES_POR_BLOQUE)
-        return bytes(self.almacenamiento[bloque * BYTES_POR_BLOQUE:(bloque + 1) * BYTES_POR_BLOQUE])
+        return bytes(self._almacenamiento[bloque * BYTES_POR_BLOQUE:(bloque + 1) * BYTES_POR_BLOQUE])
 
     def escribir_bloque(self, bloque: int, datos: bytes) -> None:
         """Escribe un bloque del disco. Los datos deben tener como máximo BYTES_POR_BLOQUE bytes.
@@ -75,7 +75,7 @@ class Disco:
         if len(datos) > BYTES_POR_BLOQUE:
             raise ValueError(f"Los datos no pueden exceder {BYTES_POR_BLOQUE} bytes")
         datos = datos.ljust(BYTES_POR_BLOQUE, b'\x00')
-        self.almacenamiento[bloque * BYTES_POR_BLOQUE:(bloque + 1) * BYTES_POR_BLOQUE] = datos
+        self._almacenamiento[bloque * BYTES_POR_BLOQUE:(bloque + 1) * BYTES_POR_BLOQUE] = datos
 
     def guardar(self, ruta: str = RUTA_ARCHIVO) -> None:
         """Guarda el contenido del disco en un archivo. Se utiliza un archivo temporal para asegurar la integridad de los datos.
@@ -88,7 +88,7 @@ class Disco:
         """
         temporal = ruta + ".tmp"
         with open(temporal, "wb") as file:
-            file.write(self.almacenamiento)
+            file.write(self._almacenamiento)
             file.flush()
             os.fsync(file.fileno())
         os.replace(temporal, ruta)
@@ -113,7 +113,7 @@ class Disco:
             return False
         if len(datos) != TOTAL_BYTES:
             raise ValueError("El archivo no coincide con el tamaño del disco")
-        self.almacenamiento = bytearray(datos)
+        self._almacenamiento = bytearray(datos)
         return True
     
     def ubicar(self, indice: int) -> Tuple[int, int, int]:
