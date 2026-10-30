@@ -16,7 +16,7 @@ class Directorio:
         self._entradas: list[tuple[str, int] | None] = [None] * MAX_ENTRADAS
 
     @staticmethod
-    def desde_bytes(datos: bytes) -> Directorio:
+    def desde_bytes(datos: bytes) -> "Directorio":
         if len(datos) != BYTES_POR_BLOQUE:
             raise ValueError(f"Un directorio ocupa exactamente {BYTES_POR_BLOQUE} bytes")
         directorio = Directorio()

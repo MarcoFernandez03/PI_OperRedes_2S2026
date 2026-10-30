@@ -88,6 +88,8 @@ class ServidorRepositorio:
             lector = conn.makefile("rb")
             sesion = SesionConexion()
             for paso in ("HELLO", "comando"):
+                linea = None
+                respuesta = None
                 try:
                     linea = self._leer_linea(lector)
                     if linea is None:

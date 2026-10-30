@@ -8,7 +8,7 @@ class Bitmap:
         self._bloque = bloque
         self._capacidad = capacidad
 
-    def reservar(self) -> int:
+    def reservar(self) -> int | None:
         """Reserva un indice en el bitmap y lo devuelve.
         
         
@@ -18,14 +18,14 @@ class Bitmap:
         Raises
             ValueError: Si no hay espacio disponible en el bitmap.
         """
-        bitmap = self._disco.leer_bloque(self._bloque)
+        bitmap = bytearray(self._disco.leer_bloque(self._bloque))
         for i in range(self._capacidad):
             byte, mascara = self._posicion(i)
             if not bitmap[byte] & mascara:
                 bitmap[byte] |= mascara
                 self._disco.escribir_bloque(self._bloque, bitmap)
                 return i
-        raise ValueError("No hay espacio disponible en el bitmap")
+        return None
 
     def liberar(self, indice: int) -> None:
         """Libera un índice en el bitmap.
@@ -38,7 +38,7 @@ class Bitmap:
         """
         self._validar_indice(indice)
         byte, mascara = self._posicion(indice)
-        bitmap = self._disco.leer_bloque(self._bloque)
+        bitmap = bytearray(self._disco.leer_bloque(self._bloque))
         if bitmap[byte] & mascara:
             bitmap[byte] &= 0xFF ^ mascara
             self._disco.escribir_bloque(self._bloque, bitmap)
@@ -56,7 +56,7 @@ class Bitmap:
         """
         self._validar_indice(indice)
         byte, mascara = self._posicion(indice)
-        bitmap = self._disco.leer_bloque(self._bloque)
+        bitmap = bytearray(self._disco.leer_bloque(self._bloque))
         if not bitmap[byte] & mascara:
             bitmap[byte] |= mascara
             self._disco.escribir_bloque(self._bloque, bitmap)
@@ -97,7 +97,7 @@ class Bitmap:
     def liberar_todo(self) -> None:
         """Libera todos los índices en el bitmap.
         """
-        self._escribir_bloque(bytearray(BYTES_POR_BLOQUE))
+        self._disco.escribir_bloque(self._bloque, bytes(BYTES_POR_BLOQUE))
 
     def _posicion(self, i: int) -> tuple[int, int]:
         return i // 8, 1 << (i % 8)

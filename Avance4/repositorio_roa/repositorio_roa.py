@@ -156,6 +156,8 @@ class RepositorioROA:
             return [ErrNoExiste.codigo]
         except PermisoDenegado:
             return [ErrPermiso.codigo]
+        except ValueError:
+            return [ErrFormato.codigo]
 
     def _despachar(self, linea: str, sesion: SesionConexion) -> list[str]:
         campos = linea.split("|")

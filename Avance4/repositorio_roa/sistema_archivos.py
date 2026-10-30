@@ -98,7 +98,7 @@ class SistemaArchivos:
         if self._tabla.leer(RAIZ).tipo != TIPO_DIRECTORIO:
             raise ValueError("El inodo 0 no es un directorio")
         for n in range(NUM_INODOS):
-            ocupado = self._bitmap_inodos.esta_ocupado(n)
+            ocupado = self._bitmap_inodos.consultar_ocupado(n)
             try:
                 self._tabla.leer(n)
                 usado = True
