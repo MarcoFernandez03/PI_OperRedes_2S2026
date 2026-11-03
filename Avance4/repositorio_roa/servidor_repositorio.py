@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 import time
@@ -133,8 +134,9 @@ class ServidorRepositorio:
 # ---------- Arranque ----------
 
 def _crear_verificador() -> Verificador:
-    # Pendiente de la interfaz acordada con Gabriel (puntos a y b)
-    raise NotImplementedError("Falta conectar el Verificador de certificados")
+    from verificador import VerificadorPKI
+    ruta = os.environ.get("RUTA_TRUSTSTORE", "out/trusted-roots.pem")
+    return VerificadorPKI(ruta)
 
 
 def arrancar(verificador: Verificador, ruta_imagen: str = RUTA_IMAGEN,
