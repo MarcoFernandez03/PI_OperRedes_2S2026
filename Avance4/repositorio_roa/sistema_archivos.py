@@ -2,7 +2,7 @@ import struct
 import threading
 
 from bitmap import Bitmap
-from candados import RegistroCandados
+from candados import RegistroCandados, LectoresEscritores
 from directorio import Directorio
 from disco import Disco, BYTES_POR_BLOQUE, BYTES_POR_SECTOR, TOTAL_BYTES
 from inodo import (TablaInodos, TIPO_ARCHIVO, TIPO_DIRECTORIO,
@@ -75,12 +75,12 @@ class SistemaArchivos:
         self._dirs = RegistroCandados()
         self._inodos = RegistroCandados()
         self._mutex_meta = threading.Lock()   # superbloque y bitmaps
-        self._escritor = threading.Lock()     # un solo escritor a la vez
+        self._escritor = LectoresEscritores()     # un solo escritor a la vez
 
     # ---------- Ciclo de vida ----------
 
     def formatear(self) -> None:
-        with self._escritor:
+        with self._escritor.escritura():
             for bloque in range(TOTAL_BLOQUES):
                 self._disco.escribir_bloque(bloque, b"")
             self._escribir_superbloque(Superbloque(0))
@@ -116,7 +116,7 @@ class SistemaArchivos:
         if not datos or len(datos) > BYTES_POR_BLOQUE:
             raise ValueError(f"El ROA debe medir entre 1 y {BYTES_POR_BLOQUE} bytes")
         self._validar_nombres(propietario, ip)
-        with self._escritor:
+        with self._escritor.escritura():
             ubicacion = self._localizar(ip)
             if ubicacion is not None:
                 self._exigir_escritura(ubicacion[1], propietario)
@@ -129,8 +129,8 @@ class SistemaArchivos:
             return True
 
     def borrar_roa(self, propietario: str, ip: str) -> None:
-        with self._escritor:
-            ubicacion = self._localizar(ip)
+        with self._escritor.escritura():
+            ubicacion = self._localizar_propio(propietario, ip)
             if ubicacion is None:
                 raise NoExiste(ip)
             num_dir, num_archivo = ubicacion
@@ -162,11 +162,12 @@ class SistemaArchivos:
 
     def listar_roas(self) -> tuple[int, list[str]]:
         # La generación se lee primero, así el contenido nunca es más viejo que ella
-        generacion = self.generacion()
-        roas = []
-        for _, num_dir in self._emisores():
-            roas.extend(self._leer_roas_de(num_dir))
-        return generacion, roas
+        with self._escritor.lectura():
+            generacion = self.generacion()
+            roas = []
+            for _, num_dir in self._emisores():
+                roas.extend(self._leer_roas_de(num_dir))
+            return generacion, roas
 
     def generacion(self) -> int:
         with self._mutex_meta:
@@ -244,6 +245,18 @@ class SistemaArchivos:
                         self._inodos.obtener(num_archivo).adquirir_lectura()
                     return num_dir, num_archivo
         return None
+
+    def _localizar_propio(self, propietario: str, ip: str):
+        """Busca la IP solo en el directorio del propietario. Devuelve
+        (inodo del directorio, inodo del archivo) o None."""
+        num_dir = self._buscar_directorio_emisor(propietario)
+        if num_dir is None:
+            return None
+        with self._dirs.obtener(num_dir).lectura():
+            num_archivo = self._leer_directorio(num_dir).buscar(ip)
+        if num_archivo is None:
+            return None
+        return num_dir, num_archivo
 
     def _emisores(self) -> list[tuple[str, int]]:
         with self._dirs.obtener(RAIZ).lectura():

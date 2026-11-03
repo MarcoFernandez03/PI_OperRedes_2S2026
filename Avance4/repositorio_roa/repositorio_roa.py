@@ -164,14 +164,14 @@ class RepositorioROA:
         comando = campos[0]
         if comando == "HELLO":
             return self._hello(campos, sesion)
+        if not sesion.hubo_hello:
+            raise ErrSinHello()
         manejadores = {
             "VERSION": self._version, "LIST": self._list, "GET": self._get,
             "CERT": self._cert, "PUT": self._put, "DELETE": self._delete,
         }
         if comando not in manejadores:
             raise ErrFormato("comando desconocido")
-        if not sesion.hubo_hello:
-            raise ErrSinHello()
         if comando in ("PUT", "DELETE") and sesion.rol != ROL_OWNER:
             raise ErrPermiso("el rol no puede modificar")
         return manejadores[comando](campos, sesion)
@@ -267,6 +267,8 @@ class RepositorioROA:
         self._almacen.guardar(sesion.identidad.num_emisor, sesion.cert_b64)
 
     def _validar_roa(self, texto: str, sesion: SesionConexion) -> _Roa:
+        identidad = sesion.identidad
+
         campos = texto.split("|")
         if len(campos) != 7 or campos[0] != "ROA":
             raise ErrFormato("el ROA no tiene siete campos")
@@ -278,21 +280,21 @@ class RepositorioROA:
         if not _BASE64.fullmatch(firma):
             raise ErrFormato("la firma del ROA no es base64")
 
-        identidad = sesion.identidad
-        if int(num) != identidad.num_emisor:
-            raise ErrPermiso("NUM_EMISOR distinto del HELLO")
-        if f"AS{isla}-{num}" != identidad.cn:
-            raise ErrPermiso("el CN del certificado no coincide con ISLA y NUM_EMISOR")
-
+        mensaje = "|".join(campos[:6]).encode("ascii")
+        if not self._verificador.verificar_firma(sesion.cert_b64, mensaje, firma):
+            raise ErrFirma("la firma del ROA no verifica")
+        
         ahora = int(self._reloj())
         if not (int(emision) <= ahora <= int(vence)):
             raise ErrExpirado("el ROA está fuera de su vigencia")
         if int(vence) > identidad.not_after:
             raise ErrExpirado("VENCE supera el notAfter del certificado")
 
-        mensaje = "|".join(campos[:6]).encode("ascii")
-        if not self._verificador.verificar_firma(sesion.cert_b64, mensaje, firma):
-            raise ErrFirma("la firma del ROA no verifica")
+        if int(num) != identidad.num_emisor:
+            raise ErrPermiso("NUM_EMISOR distinto del HELLO")
+        if f"AS{isla}-{num}" != identidad.cn:
+            raise ErrPermiso("el CN del certificado no coincide con ISLA y NUM_EMISOR")
+
         return _Roa(ip, isla, num, int(emision), int(vence), firma)
 
     @staticmethod
