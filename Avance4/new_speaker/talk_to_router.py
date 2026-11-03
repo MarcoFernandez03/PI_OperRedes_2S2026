@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.x509.oid import NameOID
 
 ROUTER_PORT_TCP = 9000
-ROUTER_IP = "192.168.100.153" #CAMBIAR por la IP del router al que se quiere conectar
+ROUTER_IP = "10.1.35.21" #CAMBIAR por la IP del router al que se quiere conectar
 
 ROUTER_ANNOUNCE_PREFIX = "HELLO|"
 ROUTER_RESPONSE_PREFIX = "HELLO_OK|"

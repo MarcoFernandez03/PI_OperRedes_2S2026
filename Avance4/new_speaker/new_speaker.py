@@ -2,7 +2,6 @@ from talk_to_router import LOCAL_ROAS, ROAS_MUTEX, connect_to_router
 import threading
 import time
 
-threading.Thread(target=connect_to_router, daemon=True).start();
 
 # Call when a new announcement is received with (IP, ISLA)
 def validar_anuncio(ip, isla):
@@ -17,11 +16,13 @@ def validar_anuncio(ip, isla):
   print(f"ANUNCIO INVALIDO: {ip} anunciado por isla {isla}, ROA dice {roa[0]}")
   return "INVALID"     # descarded
 
-while True:
+def leer_roas():
+  threading.Thread(target=connect_to_router, daemon=True).start();
+  while True:
 
-  print("LEYENDO ROAS LOCALES:")
-  ROAS_MUTEX.acquire()
-  for ip, (isla, vence) in LOCAL_ROAS.items():
-    print(f"  {ip} -> isla {isla}, vence {vence}")
-  ROAS_MUTEX.release()
-  time.sleep(5)
+    print("LEYENDO ROAS LOCALES:")
+    ROAS_MUTEX.acquire()
+    for ip, (isla, vence) in LOCAL_ROAS.items():
+      print(f"  {ip} -> isla {isla}, vence {vence}")
+    ROAS_MUTEX.release()
+    time.sleep(5)

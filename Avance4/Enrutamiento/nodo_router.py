@@ -18,6 +18,7 @@ Lo que pasa en cada parte (los numeros son los pasos de la explicacion):
   [3.7] SIGINT / SIGTERM    -> aviso de muerte a los vecinos y cierre
 """
 import json
+import os
 import signal
 import socket
 import socketserver
@@ -28,6 +29,14 @@ import time
 # nodo_router.py
 from vector_distancia import Nodo
 from tabla_rutas import TablaRutas
+
+DIR_NEW_SPEAKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "new_speaker")
+if DIR_NEW_SPEAKER not in sys.path:
+    sys.path.append(DIR_NEW_SPEAKER)
+
+from new_speaker import leer_roas
+
+threading.Thread(target=leer_roas, daemon=True).start();
 
 # ---------------------------------------------------------------------------
 # Formato del ANNOUNCE.  [ACORDAR] con los otros grupos: todo el formato vive en estas

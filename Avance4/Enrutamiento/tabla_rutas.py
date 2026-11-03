@@ -22,6 +22,12 @@ import sys
 import threading
 from typing import Dict, Optional, Tuple
 
+DIR_VM = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "virtual_memory")
+if DIR_VM not in sys.path:
+    sys.path.append(DIR_VM)
+
+from virtual_memory import VirtualMemory
+
 TAM_PAGINA = 8      # bytes por entrada/pagina (acordado en clase)
 NUM_PAGINAS = 24    # destinos maximos (acordado en clase)
 
@@ -36,7 +42,7 @@ def _memoria_en_c():
 
 class TablaRutas:
     def __init__(self, memoria=None):
-        self._mem = memoria if memoria is not None else _memoria_en_c()
+        self._mem = memoria if memoria is not None else VirtualMemory(TAM_PAGINA, NUM_PAGINAS, NUM_PAGINAS, 8)
         # Un hilo escribe el resumen (cuando cambia) mientras otros lo leen para reenviar DATA.
         # La memoria no es segura entre hilos, asi que todo acceso pasa por este candado.
         self._candado = threading.Lock()
