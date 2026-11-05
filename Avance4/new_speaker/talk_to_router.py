@@ -1,3 +1,4 @@
+
 # DEPENDS ON CRYPTOGRAPHY (pip install cryptography)
 
 import base64
@@ -45,6 +46,8 @@ def _not_before(c):
     return getattr(c, "not_valid_before_utc", None) or c.not_valid_before.replace(tzinfo=timezone.utc)
 
 def ask_cert(num_emisor):
+    # Answer is OK| followed by the lines of the certificate .txt (PEM),
+    # one message per line. Read until the END CERTIFICATE line.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(10)
     try:
@@ -54,18 +57,25 @@ def ask_cert(num_emisor):
         if not f.readline().startswith(ROUTER_RESPONSE_PREFIX):
             raise OSError("HELLO rechazado al pedir CERT")
         s.sendall(f"{CERT_PREFIX}{num_emisor}\n".encode())
-        resp = f.readline().strip()
+        first = f.readline().strip()
+        if first == "":
+            raise OSError("Conexión cerrada al pedir CERT")
+        if not first.startswith(ROUTER_COMMAND_RESPONSE_PREFIX):
+            return None  # ERR_NO_EXISTE
+        lines = [first[len(ROUTER_COMMAND_RESPONSE_PREFIX):]]
+        while "-----END CERTIFICATE-----" not in lines[-1]:
+            line = f.readline()
+            if line == "":
+                raise OSError("Certificado incompleto")
+            lines.append(line.strip())
+            if len(lines) > 100:
+                return None
     finally:
         s.close()
-    if resp == "":
-        raise OSError("Conexión cerrada al pedir CERT")
-    if not resp.startswith(ROUTER_COMMAND_RESPONSE_PREFIX):
-        return None  # ERR_NO_EXISTE
+    # Ignores empty lines and a possible numeric header (OK|<n>)
+    pem = "\n".join(l for l in lines if l and not l.isdigit())
     try:
-        raw = base64.b64decode(resp[len(ROUTER_COMMAND_RESPONSE_PREFIX):])
-        if raw.lstrip().startswith(b"-----BEGIN"):   # base64 de un PEM
-            return x509.load_pem_x509_certificate(raw)
-        return x509.load_der_x509_certificate(raw)   # base64 de un DER
+        return x509.load_pem_x509_certificate(pem.encode())
     except ValueError:
         return None
 
@@ -199,4 +209,4 @@ def connect_to_router():
           print("ROAS LOCAL ACTUALIZADAS")
           ROAS_MUTEX.release()
 
-      time.sleep(75);
+      time.sleep(75)
