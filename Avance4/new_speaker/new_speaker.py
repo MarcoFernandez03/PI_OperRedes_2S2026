@@ -15,6 +15,10 @@ def validar_anuncio(ip, isla):
   print(f"ANUNCIO INVALIDO: {ip} anunciado por isla {isla}, ROA dice {roa[0]}")
   return "INVALID"     # descarded
 
+def iniciar_sincronizador():
+  """Solo el hilo que baja y valida los ROA del repositorio (sin las impresiones de leer_roas)."""
+  threading.Thread(target=connect_to_router, daemon=True).start()
+
 def leer_roas():
   threading.Thread(target=connect_to_router, daemon=True).start();
   while True:

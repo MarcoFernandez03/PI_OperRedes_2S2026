@@ -16,6 +16,7 @@ Lo que pasa en cada parte (los numeros son los pasos de la explicacion):
   [3.5] Falla un envio      -> ese vecino se da por caido (no esperamos al silencio)
   [3.6] Llega un DATA       -> entregar / descartar / reenviar al siguiente salto (con TTL)
   [3.7] SIGINT / SIGTERM    -> aviso de muerte a los vecinos y cierre
+  [3.8] Cada ruta recibida  -> se valida contra los ROA (VALID/UNKNOWN pasan, INVALID se descarta)
 """
 import json
 import os
@@ -29,14 +30,6 @@ import time
 # nodo_router.py
 from vector_distancia import Nodo
 from tabla_rutas import TablaRutas
-
-DIR_NEW_SPEAKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "new_speaker")
-if DIR_NEW_SPEAKER not in sys.path:
-    sys.path.append(DIR_NEW_SPEAKER)
-
-from new_speaker import leer_roas
-
-threading.Thread(target=leer_roas, daemon=True).start();
 
 # ---------------------------------------------------------------------------
 # Formato del ANNOUNCE.  [ACORDAR] con los otros grupos: todo el formato vive en estas
@@ -71,6 +64,14 @@ class Router:
         self.tabla = TablaRutas(memoria)
         self.intervalo = cfg.get("intervalo_announce", 30)       # [ACORDAR]
         self.tolerancia = cfg.get("tolerancia_silencio", 40)     # [ACORDAR] mayor que el intervalo
+        # ---- [3.8] ROA (punto E). Con "validar_roa": true, un hilo baja los ROA del repositorio
+        # y cada ruta recibida se valida contra ellos antes de pasar al algoritmo.
+        # [ACORDAR] la isla N es el AS 65000+N y se representa con la IP de su servidor (172.16.N0.10).
+        self.asn_base = cfg.get("asn_base", 65000)
+        self.plantilla_ip = cfg.get("plantilla_ip_isla", "172.16.{n}0.10")
+        self._validar = None
+        if cfg.get("validar_roa", False):
+            self._iniciar_roa(cfg)
         self._detenido = threading.Event()
         self._servidores = []
         self._candado_log = threading.Lock()
@@ -131,6 +132,34 @@ class Router:
         self._registrar()
         self.anunciar()
 
+    # ---------------------------------------------------------------- [3.8] ROA
+    def _iniciar_roa(self, cfg):
+        sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "new_speaker"))
+        import talk_to_router        # necesita: pip install cryptography
+        import new_speaker
+        repo = cfg.get("repositorio", {})                  # OJO: en talk_to_router "ROUTER_IP" es la del REPOSITORIO
+        talk_to_router.ROUTER_IP = repo.get("ip", talk_to_router.ROUTER_IP)
+        talk_to_router.ROUTER_PORT_TCP = repo.get("puerto", 9000)
+        talk_to_router.TRUSTSTORE_PATH = cfg.get("truststore", talk_to_router.TRUSTSTORE_PATH)
+        self._validar = new_speaker.validar_anuncio
+        new_speaker.iniciar_sincronizador()
+
+    def _filtrar_por_roa(self, vecino, vector):
+        """Cada ruta anunciada a la isla D tiene como origen a D y a su IP (172.16.D0.10).
+        VALID y UNKNOWN se aceptan; INVALID (la IP tiene un ROA de otro AS) se descarta: queda como
+        si el vecino no la anunciara. Los -1 (inalcanzable, aviso de muerte) no se validan."""
+        if self._validar is None: # i guess bro
+            return vector
+        aceptado = {}
+        for destino, costo in vector.items():
+            if costo > 0 and destino != self.id:
+                ip, asn = self.plantilla_ip.format(n=destino), str(destino) # CAMBIAR
+                if self._validar(ip, asn) == "INVALID":
+                    self.log(f"ruta a la isla {destino} (anunciada por {vecino}) DESCARTADA: el ROA de {ip} no es de AS{asn}")
+                    continue
+            aceptado[destino] = costo
+        return aceptado
+
     # ---------------------------------------------------------------- [3.1] ANNOUNCE
     def recibir_announce(self, msg):
         r = leer_announce(msg)
@@ -138,6 +167,7 @@ class Router:
             self.log(f"ANNOUNCE mal formado, se ignora: {msg!r}")
             return
         vecino, vector = r
+        vector = self._filtrar_por_roa(vecino, vector)       # [3.8]
         if self.nodo.recibir(vecino, vector):      # True = mi tabla cambio
             self.al_cambiar()
 
