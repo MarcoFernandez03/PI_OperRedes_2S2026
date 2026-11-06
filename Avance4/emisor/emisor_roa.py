@@ -4,11 +4,13 @@ emisor_roa.py - El nodo EMISOR (owner) de una isla. Tres pasos:
   1) pedir     -> el emisor genera su llave y una CSR (la llave privada NO sale de aqui)
   2) firmar    -> la CA firma la CSR y devuelve el certificado (.crt)
   3) publicar  -> el emisor firma un ROA por cada IP suya y lo manda al repositorio cada 60 s
+  4) enviar    -> publica (como en 3) y deja escribir mensajes que se mandan al enrutador de la isla
 
 Uso:
   python3 emisor_roa.py pedir    config_emisor.json                 (en la maquina del emisor)
   python3 emisor_roa.py firmar   AS3-301.csr ../pki/out SHELL       (en la maquina de la CA)
   python3 emisor_roa.py publicar config_emisor.json                 (en la maquina del emisor)
+  python3 emisor_roa.py enviar   config_emisor.json                 (publica y manda mensajes)
 
 Aqui el AS es el numero de isla: el CN es AS<ISLA>-<NUM_EMISOR> (ej. AS3-301) y el ROA lleva ISLA=3.
 El certificado identifica al emisor; lo que une cada IP con la isla es el ROA que el emisor firma con su llave.
@@ -18,6 +20,7 @@ import json
 import os
 import socket
 import sys
+import threading
 import time
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -84,6 +87,8 @@ def _put(cfg, cert_b64, llave, roa):
 
 def publicar(cfg, una_vez=False):
     cn, _, key, _, crt = _rutas(cfg)
+    if not os.path.exists(crt):
+        raise SystemExit(f"Falta {crt}: primero 'pedir', luego la CA hace 'firmar' y se copia el .crt a esa carpeta.")
     with open(crt, "rb") as f:
         cert_b64 = pki.cert_a_b64(x509.load_pem_x509_certificate(f.read()))
     llave = cargar_llave(key)
@@ -104,47 +109,43 @@ def publicar(cfg, una_vez=False):
         time.sleep(cfg.get("intervalo", 60))
 
 
+# ------------------------------------------------------------------ 4) enviar datos (el emisor como cliente)
+def enviar_datos(cfg, isla_destino, contenido):
+    """Manda DATA|ORIGEN|DESTINO|TTL|DATOS al enrutador de MI isla (puerto 5006). El destino es el numero de isla."""
+    r = cfg.get("router", {"ip": "127.0.0.1", "puerto": 5006})
+    msg = f"{PREFIJO_DATOS}{cfg['isla']}|{isla_destino}|8|{contenido}"
+    with socket.create_connection((r["ip"], r["puerto"]), timeout=5) as s:
+        s.sendall(msg.encode())
+    print(f"Enviado al enrutador: {msg}")
+
+
+def enviar(cfg):
+    """Publica los ROA (y los sigue republicando en segundo plano) y despues deja escribir mensajes."""
+    publicar(cfg, una_vez=True)                                      # que se vea ya si el repositorio lo acepto
+    threading.Thread(target=publicar, args=(cfg,), daemon=True).start()
+    while True:
+        destino = input("Isla destino (numero): ").strip()
+        if not destino.isdigit():
+            print("Escriba el numero de isla, por ejemplo 4.")
+            continue
+        try:
+            enviar_datos(cfg, destino, input("Mensaje: "))
+        except OSError as e:
+            print(f"No se pudo hablar con el enrutador: {e}")
+
+
 def main():
     a = sys.argv[1:]
     if len(a) >= 2 and a[0] in ("pedir", "publicar"):
         cfg = json.load(open(a[1]))
         pedir(cfg) if a[0] == "pedir" else publicar(cfg, una_vez="--una-vez" in a)
+    elif len(a) == 2 and a[0] == "enviar":
+        enviar(json.load(open(a[1])))
     elif len(a) == 4 and a[0] == "firmar":
         firmar(a[1], a[2], a[3])
     else:
         print(__doc__)
 
-    cn, _, _, csr, _ = _rutas(cfg)
-    csr = pki.firmar_csr("SHELL", csr, "trust-anchors")
-
-    hello_repo(cfg)
-
-    while True:
-        ip_destino = input("Ingrese la IP del receptor: ")
-        contenido = input("Ingrese el contenido del mensaje: ")
-        enviar_datos(cfg, ip_destino, contenido)
-
-def enviar_datos(cfg, isla_destino: str, contenido: str):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect((cfg["router"]["ip"], cfg["router"]["puerto"]))
-        msg = f"{PREFIJO_DATOS}{cfg['isla']}|{isla_destino}|8|{contenido}"
-        s.sendall(msg.encode())
-        print(f"Enviado al enrutador: {msg}")
-    finally:
-        s.close()
-
-def hello_repo(cfg):
-    repo = cfg["repositorio"]
-    _, roa_b64 = crear_roa(cfg["ips"][0], cfg["isla"], cfg["num_emisor"], os.path.join(AQUI, cfg.get("carpeta_llaves", "llaves"), f"AS{cfg['isla']}-{cfg['num_emisor']}.key"), cfg.get("vigencia", 3600)).split("|")
-    with socket.create_connection((repo["ip"], repo.get("puerto", 9000)), timeout=10) as s:
-        f = s.makefile("r")
-        s.sendall(f"HELLO|OWNER|{cfg['num_emisor']}|{roa_b64}\n".encode())
-        hello = f.readline().strip().split("|")
-        if hello[0] != "HELLO_OK":
-            print(f"Error en HELLO: {hello[0]}")
-            return
-        print(f"HELLO_OK recibido: {hello}")
 
 if __name__ == "__main__":
     main()
