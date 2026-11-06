@@ -153,7 +153,7 @@ def connect_to_router():
           s.sendall(f"{ROUTER_ANNOUNCE_PREFIX}ENRUTADOR|1\n".encode())
           response = f.readline().strip()
           if response.startswith(ROUTER_RESPONSE_PREFIX):
-              print(f"Respuesta del router: {response}")
+              print(f"Respuesta del repositorio: {response}")
               s.sendall(f"{LIST_PREFIX}\n".encode())
               # Header: OK|<version>|<n>, followed by n lines of ROA
               header = f.readline().strip()
@@ -183,10 +183,10 @@ def connect_to_router():
               else:
                   print(f"Respuesta inesperada al LIST: {header}")
           else:
-              print(f"Respuesta inesperada del router: {response}")
+              print(f"Respuesta inesperada del repositorio: {response}")
       except Exception as e:
           # If something fails, leave previous ROA table
-          print(f"Error al consultar el router: {e}")
+          print(f"Error al consultar el repositorio: {e}")
       finally:
           s.close()
 
