@@ -44,7 +44,7 @@ def pedir(cfg):
     cn, carpeta, key, csr, _ = _rutas(cfg)
     os.makedirs(carpeta, exist_ok=True)
     if os.path.exists(key):
-        raise SystemExit(f"Ya existe {key}: no se sobreescribe la llave.")
+        raise OSError(f"Ya existe {key}: no se sobreescribe la llave.")
     llave = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     solicitud = (x509.CertificateSigningRequestBuilder()
                  .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn),
@@ -114,20 +114,37 @@ def main():
     else:
         print(__doc__)
 
+    cn, _, _, csr, _ = _rutas(cfg)
+    csr = pki.firmar_csr("SHELL", csr, "trust-anchors")
+
+    hello_repo(cfg)
+
     while True:
         ip_destino = input("Ingrese la IP del receptor: ")
         contenido = input("Ingrese el contenido del mensaje: ")
         enviar_datos(cfg, ip_destino, contenido)
 
-def enviar_datos(cfg, ip_destino: str, contenido: str):
+def enviar_datos(cfg, isla_destino: str, contenido: str):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.connect((cfg["router"]["ip"], cfg["router"]["puerto"]))
-        msg = f"{PREFIJO_DATOS}{ip_destino}|{contenido}"
+        msg = f"{PREFIJO_DATOS}{cfg['isla']}|{isla_destino}|8|{contenido}"
         s.sendall(msg.encode())
         print(f"Enviado al enrutador: {msg}")
     finally:
         s.close()
+
+def hello_repo(cfg):
+    repo = cfg["repositorio"]
+    _, roa_b64 = crear_roa(cfg["ips"][0], cfg["isla"], cfg["num_emisor"], os.path.join(AQUI, cfg.get("carpeta_llaves", "llaves"), f"AS{cfg['isla']}-{cfg['num_emisor']}.key"), cfg.get("vigencia", 3600)).split("|")
+    with socket.create_connection((repo["ip"], repo.get("puerto", 9000)), timeout=10) as s:
+        f = s.makefile("r")
+        s.sendall(f"HELLO|OWNER|{cfg['num_emisor']}|{roa_b64}\n".encode())
+        hello = f.readline().strip().split("|")
+        if hello[0] != "HELLO_OK":
+            print(f"Error en HELLO: {hello[0]}")
+            return
+        print(f"HELLO_OK recibido: {hello}")
 
 if __name__ == "__main__":
     main()
