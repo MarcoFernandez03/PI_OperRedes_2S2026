@@ -46,8 +46,7 @@ def _not_before(c):
     return getattr(c, "not_valid_before_utc", None) or c.not_valid_before.replace(tzinfo=timezone.utc)
 
 def ask_cert(num_emisor):
-    # Answer is OK| followed by the lines of the certificate .txt (PEM),
-    # one message per line. Read until the END CERTIFICATE line.
+    # Respuesta del repositorio (punto C): OK|<certificado DER en base64, una sola linea>
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(10)
     try:
@@ -57,25 +56,16 @@ def ask_cert(num_emisor):
         if not f.readline().startswith(ROUTER_RESPONSE_PREFIX):
             raise OSError("HELLO rechazado al pedir CERT")
         s.sendall(f"{CERT_PREFIX}{num_emisor}\n".encode())
-        first = f.readline().strip()
-        if first == "":
-            raise OSError("Conexión cerrada al pedir CERT")
-        if not first.startswith(ROUTER_COMMAND_RESPONSE_PREFIX):
-            return None  # ERR_NO_EXISTE
-        lines = [first[len(ROUTER_COMMAND_RESPONSE_PREFIX):]]
-        while "-----END CERTIFICATE-----" not in lines[-1]:
-            line = f.readline()
-            if line == "":
-                raise OSError("Certificado incompleto")
-            lines.append(line.strip())
-            if len(lines) > 100:
-                return None
+        respuesta = f.readline().strip()
     finally:
         s.close()
-    # Ignores empty lines and a possible numeric header (OK|<n>)
-    pem = "\n".join(l for l in lines if l and not l.isdigit())
+    if respuesta == "":
+        raise OSError("Conexión cerrada al pedir CERT")
+    if not respuesta.startswith(ROUTER_COMMAND_RESPONSE_PREFIX):
+        return None  # ERR_NO_EXISTE u otro error
     try:
-        return x509.load_pem_x509_certificate(pem.encode())
+        der = base64.b64decode(respuesta[len(ROUTER_COMMAND_RESPONSE_PREFIX):], validate=True)
+        return x509.load_der_x509_certificate(der)
     except ValueError:
         return None
 

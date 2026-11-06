@@ -3,11 +3,30 @@
   "escuchar_en": "",
   "puerto": 5005,
   "puerto_local": 5006,
-  "servidor_local": {"ip": "172.16.30.10", "puerto": 5005},
+  "servidor_local": {
+    "ip": "172.16.30.10",
+    "puerto": 5005
+  },
   "intervalo_announce": 30,
   "tolerancia_silencio": 40,
   "vecinos": [
-    {"isla": 4, "ip": "172.30.34.2", "puerto": 5005, "costo": 2},
-    {"isla": 5, "ip": "172.30.35.2", "puerto": 5005, "costo": 1}
-  ]
+    {
+      "isla": 4,
+      "ip": "172.30.34.2",
+      "puerto": 5005,
+      "costo": 2
+    },
+    {
+      "isla": 5,
+      "ip": "172.30.35.2",
+      "puerto": 5005,
+      "costo": 1
+    }
+  ],
+  "validar_roa": true,
+  "repositorio": {
+    "ip": "10.1.35.21",
+    "puerto": 9000
+  },
+  "truststore": "/etc/rpki/truststore/trusted-roots.pem"
 }
