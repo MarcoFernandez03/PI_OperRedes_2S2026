@@ -1,0 +1,10 @@
+{
+  "isla": 3,
+  "num_emisor": 301,
+  "equipo": "SHELL",
+  "ips": ["172.16.30.10"],
+  "repositorio": {"ip": "10.1.35.21", "puerto": 9000},
+  "carpeta_llaves": "llaves",
+  "vigencia": 3600,
+  "intervalo": 60
+}

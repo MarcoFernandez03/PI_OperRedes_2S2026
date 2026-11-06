@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -8,6 +9,7 @@ from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.x509.oid import NameOID
 
 DIAS_CA = 1825
 DIAS_NODO = 365
@@ -64,6 +66,28 @@ def generar_nodo(equipo, isla, num_emisor, directorio, cnf="nodo-ext.cnf"):
 
     _openssl(["verify", "-CAfile", ca_crt, crt])
     return key, crt
+
+def firmar_csr(equipo, csr, directorio, cnf=None):
+    """Lado de la CA: firma la solicitud (CSR) que le manda un emisor y devuelve la ruta del .crt.
+    La llave privada del emisor nunca llega aqui; solo viaja su CSR."""
+    cnf = cnf or os.path.join(os.path.dirname(os.path.abspath(__file__)), "nodo-ext.cnf")
+    with open(csr, "rb") as f:
+        solicitud = x509.load_pem_x509_csr(f.read())
+    if not solicitud.is_signature_valid:
+        raise ValueError("la firma de la CSR no es valida")
+    cn = solicitud.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    if not re.fullmatch(r"AS\d+-\d+", cn):
+        raise ValueError(f"CN '{cn}' no tiene el formato AS<ISLA>-<NUM_EMISOR>")
+    ca_key = os.path.join(directorio, f"ca-{equipo}.key")
+    ca_crt = os.path.join(directorio, f"ca-{equipo}.crt")
+    crt = os.path.join(directorio, f"{cn}.crt")
+    if os.path.exists(crt):
+        raise FileExistsError(f"Ya existe el certificado {cn}")
+    _openssl(["x509", "-req", "-in", csr, "-CA", ca_crt, "-CAkey", ca_key,
+              "-CAcreateserial", "-days", str(DIAS_NODO), "-sha256",
+              "-extfile", cnf, "-extensions", "v3_nodo", "-out", crt])
+    _openssl(["verify", "-CAfile", ca_crt, crt])
+    return crt
 
 def cargar_truststore(ruta):
     with open(ruta, "rb") as f:

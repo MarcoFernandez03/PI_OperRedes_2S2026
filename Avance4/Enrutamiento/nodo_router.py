@@ -66,8 +66,8 @@ class Router:
         self.tolerancia = cfg.get("tolerancia_silencio", 40)     # [ACORDAR] mayor que el intervalo
         # ---- [3.8] ROA (punto E). Con "validar_roa": true, un hilo baja los ROA del repositorio
         # y cada ruta recibida se valida contra ellos antes de pasar al algoritmo.
-        # [ACORDAR] la isla N es el AS 65000+N y se representa con la IP de su servidor (172.16.N0.10).
-        self.asn_base = cfg.get("asn_base", 65000)
+        # [ACORDAR] el AS es el numero de isla (sin 65000) y la isla N se representa con la IP de su servidor (172.16.N0.10).
+        self.asn_base = cfg.get("asn_base", 0)          # 0: el AS es el numero de isla (CN AS3-301, ROA ISLA=3)
         self.plantilla_ip = cfg.get("plantilla_ip_isla", "172.16.{n}0.10")
         self._validar = None
         if cfg.get("validar_roa", False):
