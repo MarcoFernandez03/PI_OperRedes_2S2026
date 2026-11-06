@@ -48,23 +48,23 @@ def actualizar_truststore(carpeta, ruta_huellas, destino):
             aceptadas.append(nombre)
             pems.append(cert.public_bytes(serialization.Encoding.PEM))
 
-        if not pems:
-            return aceptadas, rechazadas
-
-        carpeta_destino = os.path.dirname(os.path.abspath(destino))
-        os.makedirs(carpeta_destino, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=carpeta_destino, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(b"".join(pems))
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, destino)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+    if not pems:
         return aceptadas, rechazadas
-    
+
+    carpeta_destino = os.path.dirname(os.path.abspath(destino))
+    os.makedirs(carpeta_destino, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=carpeta_destino, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(b"".join(pems))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, destino)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+    return aceptadas, rechazadas
+
 if __name__ == "__main__":
     print(actualizar_truststore("trust-anchors", "fingerprints.txt",
                                 "out/trusted-roots.pem"))
