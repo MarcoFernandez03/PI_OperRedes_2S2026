@@ -70,12 +70,12 @@ class Router:
         self.asn_base = cfg.get("asn_base", 0)          # 0: el AS es el numero de isla (CN AS3-301, ROA ISLA=3)
         self.plantilla_ip = cfg.get("plantilla_ip_isla", "172.16.{n}0.10")
         self._validar = None
-        if cfg.get("validar_roa", False):
-            self._iniciar_roa(cfg)
         self._detenido = threading.Event()
         self._servidores = []
         self._candado_log = threading.Lock()
         self._candado_registro = threading.Lock()
+        if cfg.get("validar_roa", False):         # al final: _iniciar_roa usa la bitacora
+            self._iniciar_roa(cfg)
 
     # ---------------------------------------------------------------- bitacora
     def log(self, texto):
@@ -140,9 +140,27 @@ class Router:
         repo = cfg.get("repositorio", {})                  # OJO: en talk_to_router "ROUTER_IP" es la del REPOSITORIO
         talk_to_router.ROUTER_IP = repo.get("ip", talk_to_router.ROUTER_IP)
         talk_to_router.ROUTER_PORT_TCP = repo.get("puerto", 9000)
-        talk_to_router.TRUSTSTORE_PATH = cfg.get("truststore", talk_to_router.TRUSTSTORE_PATH)
+        talk_to_router.TRUSTSTORE_PATH = self._armar_truststore(cfg)
         self._validar = new_speaker.validar_anuncio
         new_speaker.iniciar_sincronizador()
+
+    def _armar_truststore(self, cfg):
+        """Genera trusted-roots.pem a partir de pki/trust-anchors + pki/fingerprints.txt (solo entran las CA cuya
+        huella coincide). Asi no hace falta crear /etc/rpki a mano. Se rehace en cada arranque: una CA nueva
+        en trust-anchors se recoge reiniciando el router."""
+        aqui = os.path.dirname(os.path.abspath(__file__))
+        pki_dir = os.path.join(aqui, "..", "pki")
+        ruta = cfg.get("truststore", "../pki/out/trusted-roots.pem")
+        ruta = ruta if os.path.isabs(ruta) else os.path.normpath(os.path.join(aqui, ruta))
+        anclas, huellas = os.path.join(pki_dir, "trust-anchors"), os.path.join(pki_dir, "fingerprints.txt")
+        if os.path.isdir(anclas) and os.path.exists(huellas):
+            sys.path.append(pki_dir)
+            from truststore import actualizar_truststore
+            aceptadas, rechazadas = actualizar_truststore(anclas, huellas, ruta)
+            self.log(f"truststore: CA aceptadas {aceptadas}; rechazadas {rechazadas}")
+        if not os.path.exists(ruta):
+            self.log(f"AVISO: no hay truststore en {ruta}; los ROA no se podran validar")
+        return ruta
 
     def _filtrar_por_roa(self, vecino, vector):
         """Cada ruta anunciada a la isla D tiene como origen a D y a su IP (172.16.D0.10).

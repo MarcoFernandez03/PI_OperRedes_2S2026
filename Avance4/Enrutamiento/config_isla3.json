@@ -28,5 +28,5 @@
     "ip": "10.1.137.29",
     "puerto": 9000
   },
-  "truststore": "/etc/rpki/truststore/trusted-roots.pem"
+  "truststore": "../pki/out/trusted-roots.pem"
 }
