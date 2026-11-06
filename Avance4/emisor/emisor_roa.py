@@ -6,7 +6,11 @@ emisor_roa.py - El nodo EMISOR (owner) de una isla. Tres pasos:
   3) publicar  -> el emisor firma un ROA por cada IP suya y lo manda al repositorio cada 60 s
   4) enviar    -> publica (como en 3) y deja escribir mensajes que se mandan al enrutador de la isla
 
-Uso:
+Uso (todo automatico):
+  python3 emisor_roa.py config_emisor.json      pide el certificado si falta, lo firma si esta la CA aqui,
+                                                publica los ROA y deja escribir mensajes
+
+Pasos sueltos:
   python3 emisor_roa.py pedir    config_emisor.json                 (en la maquina del emisor)
   python3 emisor_roa.py firmar   AS3-301.csr ../pki/out SHELL       (en la maquina de la CA)
   python3 emisor_roa.py publicar config_emisor.json                 (en la maquina del emisor)
@@ -18,6 +22,7 @@ El certificado identifica al emisor; lo que une cada IP con la isla es el ROA qu
 import base64
 import json
 import os
+import shutil
 import socket
 import sys
 import threading
@@ -134,9 +139,38 @@ def enviar(cfg):
             print(f"No se pudo hablar con el enrutador: {e}")
 
 
+# ------------------------------------------------------------------ 5) todo automatico
+def asegurar_certificado(cfg):
+    """Deja listo el certificado: pide la llave/CSR si faltan y, si esta maquina tiene la CA, la firma sola."""
+    cn, carpeta, key, csr, crt = _rutas(cfg)
+    if not os.path.exists(key):
+        print("Primera vez: se genera la llave y la solicitud de certificado.")
+        pedir(cfg)
+    if os.path.exists(crt):
+        return
+    ca = os.path.join(AQUI, cfg.get("carpeta_ca", "../pki/out"))
+    if not os.path.exists(os.path.join(ca, f"ca-{cfg['equipo']}.key")):
+        raise SystemExit(f"Falta {crt}. Esta maquina no tiene la CA: mande {csr} a la maquina de la CA, "
+                         f"alli corra 'python3 emisor_roa.py firmar {cn}.csr <carpeta de la CA> {cfg['equipo']}' "
+                         f"y copie el {cn}.crt a {carpeta}/")
+    print("La CA esta en esta maquina: se firma la solicitud.")
+    try:
+        shutil.copy(pki.firmar_csr(cfg["equipo"], csr, ca), crt)
+    except FileExistsError:
+        raise SystemExit(f"La CA ya emitio un {cn}.crt en {ca}. Si perdio la llave, borre ese .crt (y el .srl no hace falta) y repita; "
+                         f"si no, copie ese {cn}.crt a {carpeta}/")
+
+
+def automatico(cfg):
+    asegurar_certificado(cfg)
+    enviar(cfg)
+
+
 def main():
     a = sys.argv[1:]
-    if len(a) >= 2 and a[0] in ("pedir", "publicar"):
+    if len(a) == 1 and a[0].endswith(".json"):
+        automatico(json.load(open(a[0])))
+    elif len(a) >= 2 and a[0] in ("pedir", "publicar"):
         cfg = json.load(open(a[1]))
         pedir(cfg) if a[0] == "pedir" else publicar(cfg, una_vez="--una-vez" in a)
     elif len(a) == 2 and a[0] == "enviar":

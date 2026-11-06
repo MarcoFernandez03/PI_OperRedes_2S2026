@@ -3,7 +3,7 @@
   "num_emisor": 301,
   "equipo": "SHELL",
   "ips": ["10.1.35.24"],
-  "repositorio": {"ip": "10.1.35.22", "puerto": 9000},
+  "repositorio": {"ip": "10.1.137.29", "puerto": 9000},
   "router": {"ip": "10.1.35.23", "puerto": 5006},
   "carpeta_llaves": "llaves",
   "vigencia": 3600,
