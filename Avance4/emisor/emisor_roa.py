@@ -27,7 +27,7 @@ import socket
 import sys
 import threading
 import time
-
+from flujo_ca import generarLlaves
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(AQUI, "..", "pki"))     # pki.py y roa.py viven en Avance4/pki
 
@@ -167,7 +167,7 @@ def automatico(cfg):
 
 
 def main():
-    a = sys.argv[1:]
+    """a = sys.argv[1:]
     if len(a) == 1 and a[0].endswith(".json"):
         automatico(json.load(open(a[0])))
     elif len(a) >= 2 and a[0] in ("pedir", "publicar"):
@@ -178,7 +178,10 @@ def main():
     elif len(a) == 4 and a[0] == "firmar":
         firmar(a[1], a[2], a[3])
     else:
-        print(__doc__)
+        print(__doc__)"""
+    generarLlaves()
+    enviar(json.load(open(os.path.join(AQUI, "config_emisor.json"))))
+    
 
 
 if __name__ == "__main__":
