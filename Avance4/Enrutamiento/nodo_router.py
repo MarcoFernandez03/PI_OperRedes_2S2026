@@ -135,12 +135,12 @@ class Router:
     # ---------------------------------------------------------------- [3.8] ROA
     def _iniciar_roa(self, cfg):
         sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "new_speaker"))
-        import talk_to_router        # necesita: pip install cryptography
+        import talk_to_repo        # necesita: pip install cryptography
         import new_speaker
         repo = cfg.get("repositorio", {})                  # OJO: en talk_to_router "ROUTER_IP" es la del REPOSITORIO
-        talk_to_router.ROUTER_IP = repo.get("ip", talk_to_router.ROUTER_IP)
-        talk_to_router.ROUTER_PORT_TCP = repo.get("puerto", 9000)
-        talk_to_router.TRUSTSTORE_PATH = self._armar_truststore(cfg)
+        talk_to_repo.REPOSITORY_IP = repo.get("ip", talk_to_repo.REPOSITORY_IP)
+        talk_to_repo.REPOSITORY_PORT_TCP = repo.get("puerto", 9000)
+        talk_to_repo.TRUSTSTORE_PATH = self._armar_truststore(cfg)
         self._validar = new_speaker.validar_anuncio
         new_speaker.iniciar_sincronizador()
 

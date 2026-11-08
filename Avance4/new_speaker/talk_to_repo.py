@@ -14,12 +14,12 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.x509.oid import NameOID
 
-ROUTER_PORT_TCP = 9000
-ROUTER_IP = "10.1.35.21" #CAMBIAR por la IP del router al que se quiere conectar
+REPOSITORY_PORT_TCP = 9000
+REPOSITORY_IP = "10.1.35.21" #CAMBIAR por la IP del repositorio al que se quiere conectar
 
-ROUTER_ANNOUNCE_PREFIX = "HELLO|"
-ROUTER_RESPONSE_PREFIX = "HELLO_OK|"
-ROUTER_COMMAND_RESPONSE_PREFIX = "OK|"
+REPOSITORY_ANNOUNCE_PREFIX = "HELLO|"
+REPOSITORY_RESPONSE_PREFIX = "HELLO_OK|"
+REPOSITORY_COMMAND_RESPONSE_PREFIX = "OK|"
 VERSION_PREFIX = "VERSION|"
 LIST_PREFIX = "LIST"
 GET_PREFIX = "GET|"
@@ -50,10 +50,10 @@ def ask_cert(num_emisor):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(10)
     try:
-        s.connect((ROUTER_IP, ROUTER_PORT_TCP))
+        s.connect((REPOSITORY_IP, REPOSITORY_PORT_TCP))
         f = s.makefile("r")
-        s.sendall(f"{ROUTER_ANNOUNCE_PREFIX}ENRUTADOR|1\n".encode())
-        if not f.readline().startswith(ROUTER_RESPONSE_PREFIX):
+        s.sendall(f"{REPOSITORY_ANNOUNCE_PREFIX}ENRUTADOR|1\n".encode())
+        if not f.readline().startswith(REPOSITORY_RESPONSE_PREFIX):
             raise OSError("HELLO rechazado al pedir CERT")
         s.sendall(f"{CERT_PREFIX}{num_emisor}\n".encode())
         respuesta = f.readline().strip()
@@ -61,10 +61,10 @@ def ask_cert(num_emisor):
         s.close()
     if respuesta == "":
         raise OSError("Conexión cerrada al pedir CERT")
-    if not respuesta.startswith(ROUTER_COMMAND_RESPONSE_PREFIX):
+    if not respuesta.startswith(REPOSITORY_COMMAND_RESPONSE_PREFIX):
         return None  # ERR_NO_EXISTE u otro error
     try:
-        der = base64.b64decode(respuesta[len(ROUTER_COMMAND_RESPONSE_PREFIX):], validate=True)
+        der = base64.b64decode(respuesta[len(REPOSITORY_COMMAND_RESPONSE_PREFIX):], validate=True)
         return x509.load_der_x509_certificate(der)
     except ValueError:
         return None
@@ -137,7 +137,7 @@ def parse_roa(line):
         return None
     return ip, (isla, vence)
 
-def connect_to_router():
+def connect_to_repo():
     # Global variables to be used outside
     global ROA_VERSION, LOCAL_ROAS, ROAS_MUTEX, ROAS_UPDATED
     time.sleep(random.randrange(0, 75))  # Random wait to prevent concurrency
@@ -146,18 +146,18 @@ def connect_to_router():
       s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       s.settimeout(10)
       try:
-          s.connect((ROUTER_IP, ROUTER_PORT_TCP))
+          s.connect((REPOSITORY_IP, REPOSITORY_PORT_TCP))
           f = s.makefile("r")  # permite leer linea por linea
-          print(f"Conectado al router en {ROUTER_IP}:{ROUTER_PORT_TCP}")
-          # Send router announce message
-          s.sendall(f"{ROUTER_ANNOUNCE_PREFIX}ENRUTADOR|1\n".encode())
+          print(f"Conectado al repositorio en {REPOSITORY_IP}:{REPOSITORY_PORT_TCP}")
+          # Send REPOSITORY announce message
+          s.sendall(f"{REPOSITORY_ANNOUNCE_PREFIX}ENRUTADOR|1\n".encode())
           response = f.readline().strip()
-          if response.startswith(ROUTER_RESPONSE_PREFIX):
+          if response.startswith(REPOSITORY_RESPONSE_PREFIX):
               print(f"Respuesta del repositorio: {response}")
               s.sendall(f"{LIST_PREFIX}\n".encode())
               # Header: OK|<version>|<n>, followed by n lines of ROA
               header = f.readline().strip()
-              if header.startswith(ROUTER_COMMAND_RESPONSE_PREFIX):
+              if header.startswith(REPOSITORY_COMMAND_RESPONSE_PREFIX):
                   message_parts = header.split("|")
                   version = int(message_parts[1])
                   n = int(message_parts[2])

@@ -119,11 +119,19 @@ def _ext_nodo_ok(cert):
     return (bc.critical and not bc.value.ca and ku.critical
             and ku.value.digital_signature)
 
+def valido_desde(c):
+    """notBefore en UTC. cryptography < 42 solo tiene not_valid_before (sin zona horaria)."""
+    return getattr(c, "not_valid_before_utc", None) or c.not_valid_before.replace(tzinfo=timezone.utc)
+
+def valido_hasta(c):
+    """notAfter en UTC (ver valido_desde)."""
+    return getattr(c, "not_valid_after_utc", None) or c.not_valid_after.replace(tzinfo=timezone.utc)
+
 def validar_cadena(cert, raices, ahora=None):
     t = ahora if ahora is not None else time.time()
     ahora_dt = datetime.fromtimestamp(t, tz=timezone.utc)
 
-    if not (cert.not_valid_before_utc <= ahora_dt <= cert.not_valid_after_utc):
+    if not (valido_desde(cert) <= ahora_dt <= valido_hasta(cert)):
         return False, "certificado del nodo fuera de vigencia"
     if not _ext_nodo_ok(cert):
         return False, "extensiones del certificado del nodo incorrectas"
@@ -132,7 +140,7 @@ def validar_cadena(cert, raices, ahora=None):
     for raiz in raices:
         if raiz.subject != cert.issuer:
             continue
-        if not (raiz.not_valid_before_utc <= ahora_dt <= raiz.not_valid_after_utc):
+        if not (valido_desde(raiz) <= ahora_dt <= valido_hasta(raiz)):
             motivo = "raíz fuera de vigencia"
             continue
         if not _ext_raiz_ok(raiz):

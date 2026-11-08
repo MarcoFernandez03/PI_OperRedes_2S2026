@@ -2,7 +2,7 @@ import base64
 import ipaddress
 import time
 
-from pki import validar_cadena
+from pki import validar_cadena, valido_hasta
 from cryptography.x509.oid import NameOID
 
 from cryptography import x509
@@ -74,7 +74,7 @@ def verificar_roa(linea, cert, raices, ahora=None):
     if _cn(cert) != esperado:
         return False, f"CN {_cn(cert)} no coincide con {esperado}"
 
-    if roa["vence"] > cert.not_valid_after_utc.timestamp():
+    if roa["vence"] > valido_hasta(cert).timestamp():
         return False, "VENCE es posterior al notAfter del certificado"
 
     if not verificar_firma(roa, cert):

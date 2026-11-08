@@ -53,7 +53,7 @@ class VerificadorPKI:
             cn=atributos[0].value,
             isla=int(coincidencia.group(1)),
             num_emisor=int(coincidencia.group(2)),
-            not_after=int(cert.not_valid_after_utc.timestamp()),
+            not_after=int(pki.valido_hasta(cert).timestamp()),
         )
 
     def verificar_firma(self, cert_b64: str, mensaje: bytes, firma_b64: str) -> bool:

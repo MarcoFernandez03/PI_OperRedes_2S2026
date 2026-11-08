@@ -1,4 +1,4 @@
-from talk_to_router import LOCAL_ROAS, ROAS_MUTEX, connect_to_router
+from talk_to_repo import LOCAL_ROAS, ROAS_MUTEX, connect_to_repo
 import threading
 import time
 
@@ -17,10 +17,10 @@ def validar_anuncio(ip, isla):
 
 def iniciar_sincronizador():
   """Solo el hilo que baja y valida los ROA del repositorio (sin las impresiones de leer_roas)."""
-  threading.Thread(target=connect_to_router, daemon=True).start()
+  threading.Thread(target=connect_to_repo, daemon=True).start()
 
 def leer_roas():
-  threading.Thread(target=connect_to_router, daemon=True).start();
+  threading.Thread(target=connect_to_repo, daemon=True).start();
   while True:
 
     print("LEYENDO ROAS LOCALES:")
