@@ -180,6 +180,7 @@ def main():
     else:
         print(__doc__)"""
     generarLlaves()
+    input("Cuando los certificados se hayan compartido, presione Enter para publicar los ROA y dejar escribir mensajes...")
     enviar(json.load(open(os.path.join(AQUI, "config_emisor.json"))))
     
 

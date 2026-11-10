@@ -66,5 +66,5 @@ def actualizar_truststore(carpeta, ruta_huellas, destino):
     return aceptadas, rechazadas
 
 if __name__ == "__main__":
-    print(actualizar_truststore("trust-anchors", "fingerprints.txt",
-                                "out/trusted-roots.pem"))
+    print(actualizar_truststore("trust-anchors", "../repositorio_roa/fingerprints.txt",
+                                "../repositorio_roa/etc/rpki/truststore/trusted-roots.pem"))
