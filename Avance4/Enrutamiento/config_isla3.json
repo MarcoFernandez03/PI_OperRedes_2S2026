@@ -4,7 +4,7 @@
   "puerto": 5005,
   "puerto_local": 5006,
   "servidor_local": {
-    "ip": "10.1.35.24",
+    "ip": "172.16.30.102",
     "puerto": 5005
   },
   "intervalo_announce": 30,
@@ -25,8 +25,8 @@
   ],
   "validar_roa": true,
   "repositorio": {
-    "ip": "10.1.137.29",
+    "ip": "172.16.30.101",
     "puerto": 9000
   },
-  "truststore": "../pki/out/trusted-roots.pem"
+  "truststore": "../repositorio_roa/etc/rpki/truststore/trusted-roots.pem"
 }

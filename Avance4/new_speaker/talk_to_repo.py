@@ -32,7 +32,7 @@ ROA_VERSION = -1
 ROAS_UPDATED = False
 ROAS_MUTEX = threading.Lock()
 
-TRUSTSTORE_PATH = "/etc/rpki/truststore/trusted-roots.pem"  # Trusted roots
+TRUSTSTORE_PATH = "../etc/rpki/truststore/trusted-roots.pem"  # Trusted roots
 ROOTS = []
 
 def load_roots():

@@ -150,7 +150,7 @@ class Router:
         en trust-anchors se recoge reiniciando el router."""
         aqui = os.path.dirname(os.path.abspath(__file__))
         pki_dir = os.path.join(aqui, "..", "pki")
-        ruta = cfg.get("truststore", "../pki/out/trusted-roots.pem")
+        ruta = cfg.get("truststore", "../repositorio_roa/etc/rpki/truststore/trusted-roots.pem")
         ruta = ruta if os.path.isabs(ruta) else os.path.normpath(os.path.join(aqui, ruta))
         anclas, huellas = os.path.join(pki_dir, "trust-anchors"), os.path.join(pki_dir, "fingerprints.txt")
         if os.path.isdir(anclas) and os.path.exists(huellas):

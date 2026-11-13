@@ -1,5 +1,6 @@
 import os
 import socket
+import sys
 import threading
 import time
 import traceback
@@ -133,9 +134,29 @@ class ServidorRepositorio:
 
 # ---------- Arranque ----------
 
+def _cargar_truststore_py(pki_dir):
+    """Carga pki/truststore.py por su ruta: si hay un paquete de pip llamado 'truststore', un import normal elige ese."""
+    import importlib.util
+    if pki_dir not in sys.path:
+        sys.path.append(pki_dir)
+    spec = importlib.util.spec_from_file_location("rpki_truststore", os.path.join(pki_dir, "truststore.py"))
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
 def _crear_verificador() -> Verificador:
     from verificador import VerificadorPKI
-    ruta = os.environ.get("RUTA_TRUSTSTORE", "out/trusted-roots.pem")
+    aqui = os.path.dirname(os.path.abspath(__file__))
+    pki_dir = os.path.join(aqui, "..", "pki")
+    ruta = os.environ.get("RUTA_TRUSTSTORE", os.path.join(pki_dir, "out", "trusted-roots.pem"))
+    # Se arma desde pki/trust-anchors + pki/fingerprints.txt (solo entran las CA con huella correcta).
+    # Si cambia la CA, hay que reiniciar el repositorio.
+    anclas, huellas = os.path.join(pki_dir, "trust-anchors"), os.path.join(pki_dir, "fingerprints.txt")
+    if os.path.isdir(anclas) and os.path.exists(huellas):
+        actualizar_truststore = _cargar_truststore_py(pki_dir).actualizar_truststore
+        aceptadas, rechazadas = actualizar_truststore(anclas, huellas, ruta)
+        _bitacora(f"truststore: CA aceptadas {aceptadas}; rechazadas {rechazadas}")
     return VerificadorPKI(ruta)
 
 
