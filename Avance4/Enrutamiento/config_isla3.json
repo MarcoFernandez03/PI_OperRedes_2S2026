@@ -25,7 +25,7 @@
   ],
   "validar_roa": true,
   "repositorio": {
-    "ip": "172.16.30.101",
+    "ip": "172.16.30.1",
     "puerto": 9000
   },
   "truststore": "../repositorio_roa/etc/rpki/truststore/trusted-roots.pem"
